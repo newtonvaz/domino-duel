@@ -405,6 +405,7 @@ function renderPlayers(){
 
 function openPlayerModal(id){
   if(!user) return;
+  if(id && user.role !== 'admin') return;
   editingPlayerId = id || null;
   pendingPhoto = null;
   document.getElementById('playerFormError').textContent = '';
@@ -455,6 +456,7 @@ function savePlayer(){
     return;
   }
   if(editingPlayerId){
+    if(user.role !== 'admin') return;
     const p = playerById(editingPlayerId);
     p.name = name; p.photo = pendingPhoto;
   } else {
