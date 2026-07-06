@@ -1,14 +1,10 @@
-const CACHE = 'domino-v4';
+const CACHE = 'domino-v5';
 
 const STATIC = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/app.js',
-  '/manifest.json',
-  '/icons/favicon.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -25,6 +21,10 @@ self.addEventListener('activate', e => {
       self.clients.claim()
     ])
   );
+});
+
+self.addEventListener('message', e => {
+  if(e.data && e.data.action === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('fetch', e => {
