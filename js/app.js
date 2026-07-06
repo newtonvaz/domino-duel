@@ -1,442 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DOMINÓ DO TORRES — Placar & Ranking</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<!-- 🗄️ Execute este SQL no SQL Editor do Supabase Dashboard:
-  CREATE TABLE IF NOT EXISTS players (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL, photo TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
-  );
-  CREATE TABLE IF NOT EXISTS matches (
-    id TEXT PRIMARY KEY, date TIMESTAMPTZ DEFAULT NOW(),
-    team_a TEXT[] NOT NULL, team_b TEXT[] NOT NULL,
-    score_a INTEGER NOT NULL, score_b INTEGER NOT NULL,
-    winner TEXT NOT NULL, buchuda BOOLEAN DEFAULT FALSE,
-    buchuda_de_re BOOLEAN DEFAULT FALSE, duration_sec INTEGER
-  );
--->
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
-
-:root{
-  --bg:#0a0c11;
-  --surface:#12151d;
-  --surface-2:#1a1f2b;
-  --surface-3:#20263380;
-  --border:#262c3a;
-  --gold:#e8b23d;
-  --gold-deep:#a97a24;
-  --gold-soft:#f5cf7c;
-  --ivory:#f4efe4;
-  --text:#e7e6e2;
-  --text-muted:#8b93a3;
-  --green:#3ea66b;
-  --red:#d1495b;
-  --font-display:'Big Shoulders Display', sans-serif;
-  --font-body:'Work Sans', sans-serif;
-  --font-mono:'IBM Plex Mono', monospace;
-}
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
-body{
-  background:radial-gradient(circle at 50% -10%, #1b2030 0%, #0a0c11 55%);
-  color:var(--text);
-  font-family:var(--font-body);
-  min-height:100vh;
-  display:flex;
-  justify-content:center;
-}
-.app-shell{
-  width:100%;
-  max-width:520px;
-  min-height:100vh;
-  background:var(--bg);
-  display:flex;
-  flex-direction:column;
-  position:relative;
-  box-shadow:0 0 60px rgba(0,0,0,.6);
-}
-
-/* HEADER */
-header.top{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:16px 18px 12px;
-  border-bottom:1px solid var(--border);
-}
-.brand{display:flex;align-items:center;gap:10px;}
-.brand .tile-logo{
-  width:34px;height:34px;background:var(--ivory);border-radius:7px;
-  box-shadow:inset 0 0 0 2px var(--gold-deep);
-  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px;padding:4px;
-}
-.brand .tile-logo span{border-radius:50%;}
-.brand h1{
-  font-family:var(--font-display);
-  font-weight:900;
-  font-size:19px;
-  letter-spacing:.5px;
-  margin:0;
-  line-height:1;
-  color:var(--gold-soft);
-}
-.brand h1 small{display:block;font-family:var(--font-body);font-weight:500;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;}
-.admin-toggle{
-  background:var(--surface-2);
-  border:1px solid var(--border);
-  color:var(--text-muted);
-  font-family:var(--font-body);
-  font-size:12px;
-  font-weight:600;
-  padding:8px 12px;
-  border-radius:20px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  gap:6px;
-  transition:.15s;
-}
-.admin-toggle:hover{border-color:var(--gold-deep);color:var(--gold-soft);}
-body.is-admin .admin-toggle{background:var(--gold);color:#241a05;border-color:var(--gold);}
-
-/* MAIN */
-main{flex:1;padding:16px 18px 100px;overflow-y:auto;}
-.view{display:none;animation:fadein .18s ease;}
-.view.active{display:block;}
-@keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
-
-h2.section-title{
-  font-family:var(--font-display);
-  font-size:26px;
-  font-weight:800;
-  letter-spacing:.3px;
-  margin:4px 0 14px;
-  color:var(--ivory);
-}
-p.subtle{color:var(--text-muted);font-size:13px;margin:-8px 0 16px;}
-
-.card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:16px;
-  margin-bottom:12px;
-}
-.card.gold-edge{border-color:var(--gold-deep);}
-
-/* HOME */
-.hero-tile{
-  background:linear-gradient(160deg,var(--surface-2),var(--surface));
-  border:1px solid var(--border);
-  border-radius:18px;
-  padding:22px 18px;
-  margin-bottom:16px;
-  text-align:center;
-}
-.hero-tile .crown{font-size:26px;margin-bottom:4px;}
-.hero-tile h2{
-  font-family:var(--font-display);
-  font-size:32px;
-  font-weight:900;
-  margin:0 0 2px;
-  letter-spacing:.5px;
-  background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-}
-.hero-tile p{color:var(--text-muted);font-size:12.5px;margin:0 0 16px;}
-.stat-row{display:flex;gap:10px;margin-bottom:16px;}
-.stat-box{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center;}
-.stat-box .num{font-family:var(--font-mono);font-size:22px;font-weight:600;color:var(--gold-soft);}
-.stat-box .lbl{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
-
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  border:none;border-radius:12px;padding:13px 16px;font-family:var(--font-body);
-  font-weight:700;font-size:14px;cursor:pointer;width:100%;transition:.15s;
-}
-.btn-primary{background:linear-gradient(180deg,var(--gold-soft),var(--gold-deep));color:#241a05;}
-.btn-primary:hover{filter:brightness(1.08);}
-.btn-secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border);}
-.btn-secondary:hover{border-color:var(--gold-deep);}
-.btn-danger{background:transparent;color:var(--red);border:1px solid #4a2530;}
-.btn-ghost{background:transparent;color:var(--text-muted);border:1px dashed var(--border);}
-.btn-row{display:flex;gap:10px;}
-.btn-row .btn{width:auto;flex:1;}
-
-.recent-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
-.recent-item:last-child{border-bottom:none;}
-.recent-item .teams{color:var(--text);font-weight:600;}
-.recent-item .score{font-family:var(--font-mono);color:var(--gold-soft);font-weight:600;}
-
-/* PLAYERS */
-.list-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-.add-fab{background:var(--gold);color:#241a05;border:none;border-radius:10px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;}
-.admin-only{display:none;}
-body.is-admin .admin-only{display:inherit;}
-body.is-admin .admin-only.flex{display:flex;}
-
-.player-card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:10px;}
-.avatar{border-radius:50%;object-fit:cover;flex-shrink:0;}
-.avatar-fallback{display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;}
-.player-info{flex:1;min-width:0;}
-.player-info .name{font-weight:700;font-size:14.5px;color:var(--ivory);}
-.player-info .meta{font-size:12px;color:var(--text-muted);}
-.player-actions{display:flex;gap:6px;}
-.icon-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;}
-.icon-btn:hover{color:var(--gold-soft);border-color:var(--gold-deep);}
-
-.empty-state{text-align:center;padding:40px 10px;color:var(--text-muted);}
-.empty-state .big-emoji{font-size:34px;margin-bottom:10px;}
-.empty-state p{font-size:13px;margin:0 0 16px;}
-
-/* FORM / MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(5,6,9,.72);display:none;align-items:flex-end;justify-content:center;z-index:50;}
-.modal-overlay.open{display:flex;}
-.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:20px 18px 24px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;animation:slideup .2s ease;}
-@keyframes slideup{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-.modal-box h3{font-family:var(--font-display);font-size:20px;margin:0 0 14px;color:var(--ivory);}
-.field{margin-bottom:14px;}
-.field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px;font-weight:600;}
-.field input,.field select{
-  width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
-  padding:11px 12px;color:var(--text);font-family:var(--font-body);font-size:14px;
-}
-.field input:focus,.field select:focus{outline:none;border-color:var(--gold-deep);}
-.photo-row{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
-.photo-preview{width:60px;height:60px;border-radius:50%;background:var(--surface-2);border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
-.photo-preview img{width:100%;height:100%;object-fit:cover;}
-.file-label{background:var(--surface-2);border:1px solid var(--border);padding:9px 12px;border-radius:9px;font-size:12.5px;cursor:pointer;color:var(--text);}
-.error-text{color:var(--red);font-size:12.5px;text-align:center;margin-top:8px;min-height:16px;}
-.shake{animation:shake .3s;}
-@keyframes shake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(4px);}30%,50%,70%{transform:translateX(-8px);}40%,60%{transform:translateX(8px);}}
-
-/* MATCH SETUP */
-.duo-block{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
-.duo-block .duo-title{font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--gold-soft);margin-bottom:10px;letter-spacing:.3px;}
-.duo-block .duo-title.team-b{color:#8fb8e8;}
-
-/* LIVE MATCH */
-.live-board{background:linear-gradient(160deg,var(--surface-2),var(--surface));border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:14px;}
-.live-team{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-.live-team:last-child{margin-bottom:0;}
-.live-team .who{max-width:56%;}
-.live-team .who .label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);}
-.live-team .who .names{font-weight:700;font-size:15px;color:var(--ivory);line-height:1.25;}
-.pip-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:3px;width:52px;height:52px;padding:6px;background:var(--ivory);border-radius:8px;box-shadow:inset 0 0 0 2px var(--gold-deep);flex-shrink:0;}
-.pip-cell{border-radius:50%;}
-.pip-cell.on{background:#1a1f2b;}
-.pip-grid.small{width:34px;height:34px;padding:4px;gap:2px;}
-.vs-divider{text-align:center;color:var(--text-muted);font-family:var(--font-mono);font-size:11px;margin:4px 0 12px;letter-spacing:2px;}
-.score-editor{display:flex;align-items:center;gap:10px;}
-.score-num{font-family:var(--font-display);font-weight:900;font-size:32px;color:var(--gold-soft);cursor:pointer;min-width:36px;text-align:center;user-select:none;}
-.score-num:hover{filter:brightness(1.2);}
-.score-adj{background:var(--surface-2);border:1px solid var(--border);color:var(--text);width:38px;height:38px;border-radius:10px;font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.score-adj:hover{border-color:var(--gold-deep);color:var(--gold-soft);}
-.score-adj:disabled{opacity:.25;cursor:default;border-color:var(--border);color:var(--text-muted);}
-.result-panel{text-align:center;padding:10px 4px 4px;}
-.result-panel .win-tag{font-family:var(--font-display);font-size:22px;font-weight:900;color:var(--gold-soft);margin-bottom:6px;}
-.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0 16px;}
-.badge{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;letter-spacing:.3px;}
-.badge.buchuda{background:#3a2410;color:var(--gold-soft);border:1px solid var(--gold-deep);}
-.badge.re{background:#26243a;color:#b8a9ef;border:1px solid #4e4380;}
-.badge.toggle-off{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);opacity:.6;}
-
-/* HISTORY */
-.hist-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;}
-.hist-card .date-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:8px;}
-.hist-card .match-row{display:flex;align-items:center;justify-content:space-between;}
-.hist-card .side{flex:1;font-size:13.5px;font-weight:600;}
-.hist-card .side.winner{color:var(--gold-soft);}
-.hist-card .side.right{text-align:right;}
-.hist-card .mid-score{font-family:var(--font-mono);font-weight:700;font-size:16px;padding:0 10px;color:var(--ivory);}
-.hist-card .badges{margin-top:10px;justify-content:flex-start;}
-
-/* RANKING */
-.period-tabs{display:flex;gap:8px;margin-bottom:6px;}
-.period-tab{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);padding:9px;border-radius:10px;font-size:12.5px;font-weight:700;cursor:pointer;text-align:center;}
-.period-tab.active{background:var(--gold);color:#241a05;border-color:var(--gold);}
-.period-nav{display:flex;align-items:center;justify-content:space-between;margin:12px 0 16px;color:var(--text-muted);font-size:12.5px;}
-.period-nav button{background:var(--surface-2);border:1px solid var(--border);color:var(--text);width:30px;height:30px;border-radius:8px;cursor:pointer;}
-.rank-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;}
-.rank-row .pos{font-family:var(--font-display);font-weight:900;font-size:16px;color:var(--text-muted);width:22px;text-align:center;}
-.rank-row:nth-child(1) .pos{color:#f2c94c;}
-.rank-row:nth-child(2) .pos{color:#c9cdd6;}
-.rank-row:nth-child(3) .pos{color:#c98a4c;}
-.rank-row .rinfo{flex:1;min-width:0;}
-.rank-row .rinfo .name{font-weight:700;font-size:13.5px;color:var(--ivory);}
-.rank-row .rinfo .sub{font-size:11px;color:var(--text-muted);}
-.rank-row .wl{font-family:var(--font-mono);font-size:12px;text-align:right;color:var(--text-muted);}
-.rank-row .wl b{color:var(--green);}
-
-/* BOTTOM NAV */
-nav.bottom-nav{
-  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
-  width:100%;max-width:520px;background:var(--surface);border-top:1px solid var(--border);
-  display:flex;padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:10;
-}
-.nav-btn{flex:1;background:none;border:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;cursor:pointer;padding:6px 2px;border-radius:10px;}
-.nav-btn .ic{font-size:18px;}
-.nav-btn.active{color:var(--gold-soft);background:var(--surface-2);}
-
-::-webkit-scrollbar{width:6px;}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-</style>
-</head>
-<body>
-<div class="app-shell">
-
-  <header class="top">
-    <div class="brand">
-      <div class="tile-logo" id="logoTile"></div>
-      <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
-    </div>
-    <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Admin</span></button>
-  </header>
-
-  <main>
-
-    <!-- HOME -->
-    <section class="view active" id="view-home">
-      <div class="hero-tile">
-        <div class="crown">👑</div>
-        <h2 id="homeTotalMatches">0</h2>
-        <p>duelos registrados na mesa</p>
-        <div class="stat-row">
-          <div class="stat-box"><div class="num" id="statPlayers">0</div><div class="lbl">Jogadores</div></div>
-          <div class="stat-box"><div class="num" id="statBuchudas">0</div><div class="lbl">Buchudas</div></div>
-          <div class="stat-box"><div class="num" id="statRe">0</div><div class="lbl">Buchudas de ré</div></div>
-        </div>
-        <button class="btn btn-primary" onclick="showView('match')">🁢 Nova Partida</button>
-      </div>
-
-      <h2 class="section-title" style="font-size:18px;">Últimos duelos</h2>
-      <div class="card" id="recentMatchesCard">
-        <div class="empty-state" style="padding:16px 6px;">
-          <p>Nenhuma partida registrada ainda.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- PLAYERS -->
-    <section class="view" id="view-players">
-      <div class="list-header">
-        <h2 class="section-title" style="margin:0;">Jogadores</h2>
-        <button class="add-fab admin-only" onclick="openPlayerModal()">+ Adicionar</button>
-      </div>
-      <p class="subtle">Somente o admin pode cadastrar ou remover jogadores.</p>
-      <div id="playersList"></div>
-    </section>
-
-    <!-- MATCH -->
-    <section class="view" id="view-match">
-      <div id="matchSetupWrap">
-        <h2 class="section-title">Nova Partida</h2>
-        <p class="subtle">Dominó de 4: monte as duas duplas. Cada rodada vale 6 pontos.</p>
-
-        <div class="duo-block">
-          <div class="duo-title">Dupla A</div>
-          <div class="field"><select id="selA1"></select></div>
-          <div class="field" style="margin-bottom:0;"><select id="selA2"></select></div>
-        </div>
-        <div class="duo-block">
-          <div class="duo-title team-b">Dupla B</div>
-          <div class="field"><select id="selB1"></select></div>
-          <div class="field" style="margin-bottom:0;"><select id="selB2"></select></div>
-        </div>
-
-        <div class="error-text" id="matchSetupError"></div>
-        <button class="btn btn-primary" onclick="startMatch()">Iniciar Duelo ▶</button>
-      </div>
-
-      <div id="liveMatchWrap" style="display:none;"></div>
-    </section>
-
-    <!-- HISTORY -->
-    <section class="view" id="view-history">
-      <h2 class="section-title">Histórico</h2>
-      <div id="historyList"></div>
-    </section>
-
-    <!-- RANKING -->
-    <section class="view" id="view-ranking">
-      <h2 class="section-title">Ranking</h2>
-      <div class="period-tabs">
-        <button class="period-tab" data-period="week">Semana</button>
-        <button class="period-tab" data-period="month">Mês</button>
-        <button class="period-tab" data-period="all">Geral</button>
-      </div>
-      <div class="period-nav" id="periodNav" style="display:none;">
-        <button onclick="shiftPeriod(-1)">‹</button>
-        <span id="periodLabel"></span>
-        <button onclick="shiftPeriod(1)">›</button>
-      </div>
-      <div id="rankingList" style="margin-top:14px;"></div>
-    </section>
-
-  </main>
-
-  <nav class="bottom-nav">
-    <button class="nav-btn active" data-view="home"><span class="ic">🏠</span>Início</button>
-    <button class="nav-btn" data-view="players"><span class="ic">👥</span>Jogadores</button>
-    <button class="nav-btn" data-view="match"><span class="ic">🁢</span>Partida</button>
-    <button class="nav-btn" data-view="history"><span class="ic">📜</span>Histórico</button>
-    <button class="nav-btn" data-view="ranking"><span class="ic">🏆</span>Ranking</button>
-  </nav>
-</div>
-
-<!-- PLAYER MODAL -->
-<div class="modal-overlay" id="playerModalOverlay">
-  <div class="modal-box">
-    <h3 id="playerModalTitle">Novo Jogador</h3>
-    <div class="photo-row">
-      <div class="photo-preview" id="photoPreview">📷</div>
-      <label class="file-label">Escolher foto<input type="file" id="photoInput" accept="image/*" style="display:none;"></label>
-    </div>
-    <div class="field"><label>Nome completo</label><input type="text" id="playerName" placeholder="Ex: Carlos Silva"></div>
-    <div class="error-text" id="playerFormError"></div>
-    <div class="btn-row">
-      <button class="btn btn-secondary" onclick="closePlayerModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="savePlayer()">Salvar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADMIN MODAL (login / register) -->
-<div class="modal-overlay" id="adminModalOverlay">
-  <div class="modal-box">
-    <h3 id="adminModalTitle">Acesso Admin</h3>
-    <p class="subtle" style="margin-top:-8px;" id="adminModalSub">Entre com seu e-mail e senha de admin.</p>
-
-    <!-- Login form -->
-    <div id="adminLoginForm">
-      <div class="field"><label>E-mail</label><input type="email" id="adminEmailInput" placeholder="admin@email.com" autocomplete="email"></div>
-      <div class="field"><label>Senha</label><input type="password" id="adminPasswordInput" placeholder="Sua senha" autocomplete="current-password"></div>
-      <div class="error-text" id="adminError"></div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" onclick="closeAdminModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="submitAdminLogin()">Entrar</button>
-      </div>
-      <button class="btn btn-ghost" style="margin-top:10px;" id="adminToggleRegisterBtn" onclick="showAdminRegister()">Criar conta admin</button>
-    </div>
-
-    <!-- Register form -->
-    <div id="adminRegisterForm" style="display:none;">
-      <div class="field"><label>E-mail</label><input type="email" id="adminRegEmailInput" placeholder="admin@email.com" autocomplete="email"></div>
-      <div class="field"><label>Senha</label><input type="password" id="adminRegPasswordInput" placeholder="Crie uma senha" autocomplete="new-password"></div>
-      <div class="field"><label>Confirmar senha</label><input type="password" id="adminRegConfirmInput" placeholder="Repita a senha" autocomplete="new-password"></div>
-      <div class="error-text" id="adminRegError"></div>
-      <div class="btn-row">
-        <button class="btn btn-secondary" onclick="showAdminLogin()">Voltar</button>
-        <button class="btn btn-primary" onclick="submitAdminRegister()">Criar Conta</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
 /* ---------- SUPABASE ---------- */
 const SUPABASE_URL = 'https://wwwntppaulmtmkmmezzt.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lrXwCVybnHQSMHWH01lANg_S6OtDEtY';
@@ -539,7 +100,7 @@ async function deleteMatchSupabase(id){
 }
 
 async function deletePlayerSupabase(id){
-  if(!confirm('Remover este jogador? O histórico de partidas será mantido.')) return;
+  if(!confirm('Remover este jogador? O hist\u00f3rico de partidas ser\u00e1 mantido.')) return;
   data.players = data.players.filter(p=>p.id!==id);
   saveLocal();
   if(supabase) enqueueSave(() => supabase.from('players').delete().eq('id', id));
@@ -584,7 +145,7 @@ function pipsHTML(n, small){
 }
 function fmtDate(iso){
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) + ' às ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) + ' \u00e0s ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
 function fmtDuration(sec){
   if(!sec && sec !== 0) return '--';
@@ -629,10 +190,10 @@ function updateAdminUI(){
   const icon = document.getElementById('adminToggleBtn').firstChild;
   if(adminChecking){
     btn.textContent = '...';
-    icon.textContent = '⏳ ';
+    icon.textContent = '\u23f3 ';
   } else {
     btn.textContent = admin ? 'Sair' : 'Admin';
-    icon.textContent = admin ? '🔓 ' : '🔒 ';
+    icon.textContent = admin ? '\U0001f513 ' : '\U0001f512 ';
   }
 }
 
@@ -681,7 +242,7 @@ async function submitAdminLogin(){
   const pass = document.getElementById('adminPasswordInput').value;
   const err = document.getElementById('adminError');
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
-  if(!supabase){ err.textContent = 'Supabase não disponível.'; return; }
+  if(!supabase){ err.textContent = 'Supabase n\u00e3o dispon\u00edvel.'; return; }
   const {error} = await supabase.auth.signInWithPassword({email, password: pass});
   if(error){
     err.textContent = error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message;
@@ -700,16 +261,16 @@ async function submitAdminRegister(){
   const confirm = document.getElementById('adminRegConfirmInput').value;
   const err = document.getElementById('adminRegError');
   if(!email || !pass || !confirm){ err.textContent = 'Preencha todos os campos.'; return; }
-  if(!email.includes('@')){ err.textContent = 'Informe um e-mail válido.'; return; }
+  if(!email.includes('@')){ err.textContent = 'Informe um e-mail v\u00e1lido.'; return; }
   if(pass.length < 6){ err.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
-  if(pass !== confirm){ err.textContent = 'Senhas não conferem.'; return; }
-  if(!supabase){ err.textContent = 'Supabase não disponível.'; return; }
+  if(pass !== confirm){ err.textContent = 'Senhas n\u00e3o conferem.'; return; }
+  if(!supabase){ err.textContent = 'Supabase n\u00e3o dispon\u00edvel.'; return; }
   const {error} = await supabase.auth.signUp({email, password: pass});
   if(error){
     err.textContent = error.message;
     return;
   }
-  alert('Conta criada! Verifique seu e-mail para confirmar o cadastro (ou já pode estar logado).');
+  alert('Conta criada! Verifique seu e-mail para confirmar o cadastro (ou j\u00e1 pode estar logado).');
   admin = true;
   updateAdminUI();
   closeAdminModal();
@@ -737,7 +298,7 @@ function renderHome(){
     const teamAName = `${playerName(m.teamA[0])} &amp; ${playerName(m.teamA[1])}`;
     const teamBName = `${playerName(m.teamB[0])} &amp; ${playerName(m.teamB[1])}`;
     return `<div class="recent-item">
-      <span class="teams">${m.winner==='A'?'👑 ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'👑 ':''}${teamBName}</span>
+      <span class="teams">${m.winner==='A'?'\U0001f451 ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'\U0001f451 ':''}${teamBName}</span>
       <span class="score">${m.scoreA}x${m.scoreB}</span>
     </div>`;
   }).join('');
@@ -748,8 +309,8 @@ function renderPlayers(){
   const list = document.getElementById('playersList');
   if(data.players.length===0){
     list.innerHTML = `<div class="empty-state">
-      <div class="big-emoji">🂠</div>
-      <p>Nenhum jogador cadastrado.${admin?' Adicione o primeiro jogador para começar.':' Peça ao admin para cadastrar os jogadores.'}</p>
+      <div class="big-emoji">\U0001f0a0</div>
+      <p>Nenhum jogador cadastrado.${admin?' Adicione o primeiro jogador para come\u00e7ar.':' Pe\u00e7a ao admin para cadastrar os jogadores.'}</p>
       <button class="btn btn-primary admin-only" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="openPlayerModal()">+ Adicionar Jogador</button>
     </div>`;
     return;
@@ -762,8 +323,8 @@ function renderPlayers(){
         <div class="meta">Jogador</div>
       </div>
       <div class="player-actions admin-only flex">
-        <button class="icon-btn" onclick="openPlayerModal('${p.id}')" title="Editar">✎</button>
-        <button class="icon-btn" onclick="deletePlayer('${p.id}')" title="Remover">🗑</button>
+        <button class="icon-btn" onclick="openPlayerModal('${p.id}')" title="Editar">\u270e</button>
+        <button class="icon-btn" onclick="deletePlayer('${p.id}')" title="Remover">\U0001f5d1</button>
       </div>
     </div>
   `).join('');
@@ -779,11 +340,11 @@ function openPlayerModal(id){
     document.getElementById('playerModalTitle').textContent = 'Editar Jogador';
     document.getElementById('playerName').value = p.name || '';
     pendingPhoto = p.photo || null;
-    document.getElementById('photoPreview').innerHTML = p.photo ? `<img src="${p.photo}">` : '📷';
+    document.getElementById('photoPreview').innerHTML = p.photo ? `<img src="${p.photo}">` : '\U0001f4f7';
   } else {
     document.getElementById('playerModalTitle').textContent = 'Novo Jogador';
     document.getElementById('playerName').value = '';
-    document.getElementById('photoPreview').innerHTML = '📷';
+    document.getElementById('photoPreview').innerHTML = '\U0001f4f7';
   }
   document.getElementById('playerModalOverlay').classList.add('open');
 }
@@ -837,8 +398,8 @@ function renderMatchSetup(){
 
   if(data.players.length < 4){
     document.getElementById('matchSetupWrap').innerHTML = `<div class="empty-state">
-      <div class="big-emoji">🁢</div>
-      <p>É preciso ao menos 4 jogadores cadastrados para iniciar um duelo (2 contra 2).</p>
+      <div class="big-emoji">\U0001f0e2</div>
+      <p>\u00c9 preciso ao menos 4 jogadores cadastrados para iniciar um duelo (2 contra 2).</p>
       <button class="btn btn-secondary" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="showView('players')">Ver Jogadores</button>
     </div>`;
     return;
@@ -862,7 +423,7 @@ function startMatch(){
   const ids = [a1,a2,b1,b2];
   const err = document.getElementById('matchSetupError');
   if(ids.some(x=>!x)){ err.textContent = 'Selecione os 4 jogadores.'; return; }
-  if(new Set(ids).size !== 4){ err.textContent = 'Cada jogador só pode aparecer uma vez.'; return; }
+  if(new Set(ids).size !== 4){ err.textContent = 'Cada jogador s\u00f3 pode aparecer uma vez.'; return; }
   err.textContent = '';
   matchState = {
     teamA:[a1,a2], teamB:[b1,b2],
@@ -891,10 +452,10 @@ function renderLiveMatch(){
     const buchudaDeRePossible = loserScore === 5;
     resultHTML = `
       <div class="result-panel">
-        <div class="win-tag">👑 ${winName} venceu!</div>
+        <div class="win-tag">\U0001f451 ${winName} venceu!</div>
         <div class="badges">
-          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">🁢 Buchuda${bActive?' ✓':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">🁢 Buchuda</span>`}
-          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">🁢 Buchuda de ré${reActive?' ✓':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">🁢 Buchuda de ré</span>`}
+          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">\U0001f0e2 Buchuda${bActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\U0001f0e2 Buchuda</span>`}
+          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">\U0001f0e2 Buchuda de r\u00e9${reActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\U0001f0e2 Buchuda de r\u00e9</span>`}
         </div>
         <p class="subtle" style="text-align:center;margin:4px 0 12px;">Clique nos selos acima para marcar/desmarcar</p>
         <div class="btn-row">
@@ -909,17 +470,17 @@ function renderLiveMatch(){
       <div class="live-team">
         <div class="who"><div class="label">Dupla A</div><div class="names">${teamAName}</div></div>
         <div class="score-editor">
-          <button class="score-adj" onclick="adjustScore('A',-1)" ${matchState.scoreA<=0?'disabled':''}>−</button>
+          <button class="score-adj" onclick="adjustScore('A',-1)" ${matchState.scoreA<=0?'disabled':''}>\u2212</button>
           <span class="score-num" id="scoreNumA" onclick="editScore('A')">${matchState.scoreA}</span>
           <button class="score-adj" onclick="adjustScore('A',1)" ${matchState.scoreA>=6?'disabled':''}>+</button>
           ${pipsHTML(matchState.scoreA, true)}
         </div>
       </div>
-      <div class="vs-divider">— × —</div>
+      <div class="vs-divider">\u2014 \u00d7 \u2014</div>
       <div class="live-team">
         <div class="who"><div class="label">Dupla B</div><div class="names">${teamBName}</div></div>
         <div class="score-editor">
-          <button class="score-adj" onclick="adjustScore('B',-1)" ${matchState.scoreB<=0?'disabled':''}>−</button>
+          <button class="score-adj" onclick="adjustScore('B',-1)" ${matchState.scoreB<=0?'disabled':''}>\u2212</button>
           <span class="score-num" id="scoreNumB" onclick="editScore('B')">${matchState.scoreB}</span>
           <button class="score-adj" onclick="adjustScore('B',1)" ${matchState.scoreB>=6?'disabled':''}>+</button>
           ${pipsHTML(matchState.scoreB, true)}
@@ -928,7 +489,7 @@ function renderLiveMatch(){
     </div>
     ${resultHTML}
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="undoPoint()">↺ Desfazer</button>
+      <button class="btn btn-secondary" onclick="undoPoint()">\u21ba Desfazer</button>
       <button class="btn btn-danger" onclick="cancelMatch()">Cancelar Partida</button>
     </div>
   `;
@@ -958,7 +519,7 @@ function editScore(team){
   const input = prompt(`Placar da Dupla ${team} (0-6):`, current);
   if(input === null) return;
   const val = parseInt(input, 10);
-  if(isNaN(val) || val < 0 || val > 6){ alert('Valor inválido. Digite um número de 0 a 6.'); return; }
+  if(isNaN(val) || val < 0 || val > 6){ alert('Valor inv\u00e1lido. Digite um n\u00famero de 0 a 6.'); return; }
   matchState[key] = val;
   if(team==='A' && matchState.scoreB===6){
     matchState.finished = true;
@@ -1051,7 +612,7 @@ function renderHistory(){
   const list = document.getElementById('historyList');
   const matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(matches.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">📜</div><p>Nenhuma partida no histórico ainda. Jogue um duelo para começar a registrar.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\U0001f4dc</div><p>Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.</p></div>`;
     return;
   }
   list.innerHTML = matches.map(m=>{
@@ -1061,17 +622,17 @@ function renderHistory(){
       <div class="date-row">
         <span>${fmtDate(m.date)}</span>
         <span style="display:flex;align-items:center;gap:8px;">
-          <button class="icon-btn admin-only" onclick="deleteMatch('${m.id}')" title="Remover duelo" style="width:28px;height:28px;font-size:12px;">🗑</button>
+          <button class="icon-btn admin-only" onclick="deleteMatch('${m.id}')" title="Remover duelo" style="width:28px;height:28px;font-size:12px;">\U0001f5d1</button>
         </span>
       </div>
       <div class="match-row">
-        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'👑 ':''}${teamAName}</div>
+        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\U0001f451 ':''}${teamAName}</div>
         <div class="mid-score">${m.scoreA} x ${m.scoreB}</div>
-        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' 👑':''}</div>
+        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' \U0001f451':''}</div>
       </div>
       ${(m.buchuda || m.buchudaDeRe) ? `<div class="badges">
-        ${m.buchuda?'<span class="badge buchuda">🁢 Buchuda</span>':''}
-        ${m.buchudaDeRe?'<span class="badge re">🁢 Buchuda de ré</span>':''}
+        ${m.buchuda?'<span class="badge buchuda">\U0001f0e2 Buchuda</span>':''}
+        ${m.buchudaDeRe?'<span class="badge re">\U0001f0e2 Buchuda de r\u00e9</span>':''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -1109,7 +670,7 @@ function shiftPeriod(dir){
 
 function getWeekRange(offset){
   const now = new Date();
-  const day = (now.getDay()+6)%7; // Monday=0
+  const day = (now.getDay()+6)%7;
   const monday = new Date(now); monday.setHours(0,0,0,0); monday.setDate(now.getDate()-day+offset*7);
   const sunday = new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59,999);
   return [monday, sunday];
@@ -1123,7 +684,7 @@ function getMonthRange(offset){
 function periodLabelText(range){
   const opts = {day:'2-digit',month:'2-digit'};
   if(rankingPeriod==='week'){
-    return `${range[0].toLocaleDateString('pt-BR',opts)} – ${range[1].toLocaleDateString('pt-BR',opts)}${periodOffset===0?' (atual)':''}`;
+    return `${range[0].toLocaleDateString('pt-BR',opts)} \u2013 ${range[1].toLocaleDateString('pt-BR',opts)}${periodOffset===0?' (atual)':''}`;
   }
   return range[0].toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
 }
@@ -1173,7 +734,7 @@ function renderRanking(){
 
   const list = document.getElementById('rankingList');
   if(rows.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">🏆</div><p>Nenhuma partida registrada neste período.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\U0001f3c6</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
     return;
   }
   list.innerHTML = rows.map((r,i)=>{
@@ -1183,9 +744,9 @@ function renderRanking(){
     const name2 = p2 ? p2.name : 'Jogador removido';
     const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
     const extras = [];
-    if(r.buchudasFeitas) extras.push(`🁢 ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
-    if(r.buchudaDeRe) extras.push(`🁢 ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de ré`);
-    if(r.buchudasSofridas) extras.push(`😬 ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
+    if(r.buchudasFeitas) extras.push(`\U0001f0e2 ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
+    if(r.buchudaDeRe) extras.push(`\U0001f0e2 ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
+    if(r.buchudasSofridas) extras.push(`\U0001f62c ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -1193,9 +754,9 @@ function renderRanking(){
       </div>
       <div class="rinfo">
         <div class="name" style="font-size:13px;">${escapeHtml(name1)} &amp; ${escapeHtml(name2)}</div>
-        <div class="sub">${extras.join(' · ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}</div>
+        <div class="sub">${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}</div>
       </div>
-      <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> · ${r.saldo >= 0 ? '+' : ''}${r.saldo} · ${winPct}%</div>
+      <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
     </div>`;
   }).join('');
 }
@@ -1206,6 +767,3 @@ function renderRanking(){
   await checkAdminSession();
   renderHome();
 })();
-</script>
-</body>
-</html>

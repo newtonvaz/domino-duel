@@ -1,1 +1,12 @@
+# macOS
 ._*
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local

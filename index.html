@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOMINÓ DO TORRES — Placar & Ranking</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="top">
+    <div class="brand">
+      <div class="tile-logo" id="logoTile"></div>
+      <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
+    </div>
+    <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Admin</span></button>
+  </header>
+
+  <main>
+
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div class="hero-tile">
+        <div class="crown">👑</div>
+        <h2 id="homeTotalMatches">0</h2>
+        <p>duelos registrados na mesa</p>
+        <div class="stat-row">
+          <div class="stat-box"><div class="num" id="statPlayers">0</div><div class="lbl">Jogadores</div></div>
+          <div class="stat-box"><div class="num" id="statBuchudas">0</div><div class="lbl">Buchudas</div></div>
+          <div class="stat-box"><div class="num" id="statRe">0</div><div class="lbl">Buchudas de ré</div></div>
+        </div>
+        <button class="btn btn-primary" onclick="showView('match')">🁢 Nova Partida</button>
+      </div>
+
+      <h2 class="section-title" style="font-size:18px;">Últimos duelos</h2>
+      <div class="card" id="recentMatchesCard">
+        <div class="empty-state" style="padding:16px 6px;">
+          <p>Nenhuma partida registrada ainda.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAYERS -->
+    <section class="view" id="view-players">
+      <div class="list-header">
+        <h2 class="section-title" style="margin:0;">Jogadores</h2>
+        <button class="add-fab admin-only" onclick="openPlayerModal()">+ Adicionar</button>
+      </div>
+      <p class="subtle">Somente o admin pode cadastrar ou remover jogadores.</p>
+      <div id="playersList"></div>
+    </section>
+
+    <!-- MATCH -->
+    <section class="view" id="view-match">
+      <div id="matchSetupWrap">
+        <h2 class="section-title">Nova Partida</h2>
+        <p class="subtle">Dominó de 4: monte as duas duplas. Cada rodada vale 6 pontos.</p>
+
+        <div class="duo-block">
+          <div class="duo-title">Dupla A</div>
+          <div class="field"><select id="selA1"></select></div>
+          <div class="field" style="margin-bottom:0;"><select id="selA2"></select></div>
+        </div>
+        <div class="duo-block">
+          <div class="duo-title team-b">Dupla B</div>
+          <div class="field"><select id="selB1"></select></div>
+          <div class="field" style="margin-bottom:0;"><select id="selB2"></select></div>
+        </div>
+
+        <div class="error-text" id="matchSetupError"></div>
+        <button class="btn btn-primary" onclick="startMatch()">Iniciar Duelo ▶</button>
+      </div>
+
+      <div id="liveMatchWrap" style="display:none;"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history">
+      <h2 class="section-title">Histórico</h2>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- RANKING -->
+    <section class="view" id="view-ranking">
+      <h2 class="section-title">Ranking</h2>
+      <div class="period-tabs">
+        <button class="period-tab" data-period="week">Semana</button>
+        <button class="period-tab" data-period="month">Mês</button>
+        <button class="period-tab" data-period="all">Geral</button>
+      </div>
+      <div class="period-nav" id="periodNav" style="display:none;">
+        <button onclick="shiftPeriod(-1)">‹</button>
+        <span id="periodLabel"></span>
+        <button onclick="shiftPeriod(1)">›</button>
+      </div>
+      <div id="rankingList" style="margin-top:14px;"></div>
+    </section>
+
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="home"><span class="ic">🏠</span>Início</button>
+    <button class="nav-btn" data-view="players"><span class="ic">👥</span>Jogadores</button>
+    <button class="nav-btn" data-view="match"><span class="ic">🁢</span>Partida</button>
+    <button class="nav-btn" data-view="history"><span class="ic">📜</span>Histórico</button>
+    <button class="nav-btn" data-view="ranking"><span class="ic">🏆</span>Ranking</button>
+  </nav>
+</div>
+
+<!-- PLAYER MODAL -->
+<div class="modal-overlay" id="playerModalOverlay">
+  <div class="modal-box">
+    <h3 id="playerModalTitle">Novo Jogador</h3>
+    <div class="photo-row">
+      <div class="photo-preview" id="photoPreview">📷</div>
+      <label class="file-label">Escolher foto<input type="file" id="photoInput" accept="image/*" style="display:none;"></label>
+    </div>
+    <div class="field"><label>Nome completo</label><input type="text" id="playerName" placeholder="Ex: Carlos Silva"></div>
+    <div class="error-text" id="playerFormError"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closePlayerModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePlayer()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="modal-overlay" id="adminModalOverlay">
+  <div class="modal-box">
+    <h3 id="adminModalTitle">Acesso Admin</h3>
+    <p class="subtle" style="margin-top:-8px;" id="adminModalSub">Entre com seu e-mail e senha de admin.</p>
+
+    <div id="adminLoginForm">
+      <div class="field"><label>E-mail</label><input type="email" id="adminEmailInput" placeholder="admin@email.com" autocomplete="email"></div>
+      <div class="field"><label>Senha</label><input type="password" id="adminPasswordInput" placeholder="Sua senha" autocomplete="current-password"></div>
+      <div class="error-text" id="adminError"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="closeAdminModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="submitAdminLogin()">Entrar</button>
+      </div>
+      <button class="btn btn-ghost" style="margin-top:10px;" id="adminToggleRegisterBtn" onclick="showAdminRegister()">Criar conta admin</button>
+    </div>
+
+    <div id="adminRegisterForm" style="display:none;">
+      <div class="field"><label>E-mail</label><input type="email" id="adminRegEmailInput" placeholder="admin@email.com" autocomplete="email"></div>
+      <div class="field"><label>Senha</label><input type="password" id="adminRegPasswordInput" placeholder="Crie uma senha" autocomplete="new-password"></div>
+      <div class="field"><label>Confirmar senha</label><input type="password" id="adminRegConfirmInput" placeholder="Repita a senha" autocomplete="new-password"></div>
+      <div class="error-text" id="adminRegError"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="showAdminLogin()">Voltar</button>
+        <button class="btn btn-primary" onclick="submitAdminRegister()">Criar Conta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
