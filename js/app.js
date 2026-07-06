@@ -195,7 +195,12 @@ function openAdminModal(){
   document.getElementById('adminModalOverlay').classList.add('open');
   if(!user) setTimeout(()=>document.getElementById('adminEmailInput').focus(), 50);
 }
-function closeAdminModal(){ document.getElementById('adminModalOverlay').classList.remove('open'); }
+function closeAdminModal(){
+  document.getElementById('adminModalOverlay').classList.remove('open');
+  document.getElementById('adminPendingSection').style.display = 'none';
+  document.getElementById('logoutBtn').style.display = 'none';
+  showAdminLogin();
+}
 
 function showAdminLogin(){
   document.getElementById('adminLoginForm').style.display = 'block';
