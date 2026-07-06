@@ -297,9 +297,8 @@ async function rejectUser(id){
 function logout(){
   user = null;
   sessionStorage.removeItem('duelo_user');
-  updateAuthUI();
   closeAdminModal();
-  showView('home');
+  location.reload();
 }
 
 /* ---------- HOME ---------- */
