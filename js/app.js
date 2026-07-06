@@ -217,10 +217,22 @@ async function submitLogin(){
   const pass = document.getElementById('adminPasswordInput').value;
   const err = document.getElementById('adminError');
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
+  const creds = JSON.parse(localStorage.getItem('duelo_credentials') || '{}');
+  if(creds.email === email && creds.password === pass){
+    user = {email: creds.email, role: creds.role};
+    localStorage.setItem('duelo_user', JSON.stringify(user));
+    updateAuthUI();
+    closeAdminModal();
+    renderPlayers();
+    startPolling();
+    if(user.role === 'admin') renderPendingUsers();
+    return;
+  }
   const res = await api('login', {email, password: pass});
   if(res && res.ok){
     user = {email: res.email, role: res.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
+    localStorage.setItem('duelo_credentials', JSON.stringify({email, password: pass, role: res.role}));
     updateAuthUI();
     closeAdminModal();
     renderPlayers();
