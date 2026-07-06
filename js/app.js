@@ -1,44 +1,23 @@
-/* ---------- SUPABASE ---------- */
-const SUPABASE_URL = 'https://wwwntppaulmtmkmmezzt.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_lrXwCVybnHQSMHWH01lANg_S6OtDEtY';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-
+/* ---------- API (MySQL) ---------- */
+const API_URL = 'https://dominoduelpro.freedev.app/api/index.php';
 const STORAGE_KEY = 'duelo_domino_data_v1';
 let data = {players:[], matches:[], settings:{}};
-let loadingPromise = null;
 
-async function loadFromSupabase(){
-  if(!supabase) return null;
+async function api(method, body){
   try{
-    const [playersRes, matchesRes] = await Promise.all([
-      supabase.from('players').select('*').order('created_at'),
-      supabase.from('matches').select('*').order('date', {ascending:false})
-    ]);
-    if(playersRes.error) throw playersRes.error;
-    if(matchesRes.error) throw matchesRes.error;
-    const players = playersRes.data.map(p => ({id:p.id, name:p.name, photo:p.photo, created_at:p.created_at}));
-    const matches = matchesRes.data.map(m => ({
-      id:m.id, date:m.date, teamA:m.team_a, teamB:m.team_b,
-      scoreA:m.score_a, scoreB:m.score_b, winner:m.winner,
-      buchuda:m.buchuda, buchudaDeRe:m.buchuda_de_re, durationSec:m.duration_sec
-    }));
-    return {players, matches};
+    const res = await fetch(`${API_URL}?action=${method}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: body ? JSON.stringify(body) : undefined
+    });
+    return await res.json();
   }catch(e){
-    console.warn('Supabase fetch failed, using local:', e);
+    console.warn('API error:', e);
     return null;
   }
 }
 
-async function loadData(){
-  if(supabase){
-    const remote = await loadFromSupabase();
-    if(remote){
-      data.players = remote.players;
-      data.matches = remote.matches;
-      saveLocal();
-      return;
-    }
-  }
+function loadLocal(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw) data = JSON.parse(raw);
@@ -46,64 +25,55 @@ async function loadData(){
   if(!data.settings) data.settings = {};
 }
 
-function saveLocal(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){} }
-
-const saveQueue = [];
-let saving = false;
-async function processSaveQueue(){
-  if(saving || saveQueue.length === 0) return;
-  saving = true;
-  const items = saveQueue.splice(0);
-  try{
-    await Promise.all(items.map(fn => fn()));
-  }catch(e){ console.warn('Supabase save error:', e); }
-  saving = false;
-  processSaveQueue();
+function saveLocal(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
 }
-function enqueueSave(fn){
-  saveQueue.push(fn);
-  processSaveQueue();
+
+async function loadData(){
+  loadLocal();
+  const playersRemote = await api('listPlayers');
+  const matchesRemote = await api('listMatches');
+  if(playersRemote && Array.isArray(playersRemote) && playersRemote.length > 0){
+    data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
+  } else if(data.players.length > 0) {
+    api('savePlayers', {players: data.players.filter(p => p.id)});
+  }
+  if(matchesRemote && Array.isArray(matchesRemote) && matchesRemote.length > 0){
+    data.matches = matchesRemote.map(m => ({
+      id: m.id, date: m.date,
+      teamA: m.team_a || m.teamA,
+      teamB: m.team_b || m.teamB,
+      scoreA: m.score_a ?? m.scoreA,
+      scoreB: m.score_b ?? m.scoreB,
+      winner: m.winner,
+      buchuda: m.buchuda,
+      buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
+      durationSec: m.duration_sec ?? m.durationSec
+    }));
+    saveLocal();
+  } else if(data.matches.length > 0) {
+    api('saveMatches', {matches: data.matches.filter(m => m.id)});
+  }
 }
 
 async function saveData(){
   saveLocal();
-  if(!supabase) return;
-  // Sync players
-  const {data: existing} = await supabase.from('players').select('id');
-  const existingIds = new Set((existing||[]).map(p => p.id));
-  const localIds = new Set(data.players.map(p => p.id));
-  const toInsert = data.players.filter(p => !existingIds.has(p.id));
-  const toDelete = [...existingIds].filter(id => !localIds.has(id));
-  const toUpdate = data.players.filter(p => existingIds.has(p.id));
-  if(toInsert.length) enqueueSave(() => supabase.from('players').insert(toInsert.map(p => ({id:p.id, name:p.name, photo:p.photo}))));
-  if(toDelete.length) enqueueSave(() => supabase.from('players').delete().in('id', toDelete));
-  for(const p of toUpdate) enqueueSave(() => supabase.from('players').update({name:p.name, photo:p.photo}).eq('id', p.id));
-  // Sync matches
-  const {data: existingM} = await supabase.from('matches').select('id');
-  const existingMIds = new Set((existingM||[]).map(m => m.id));
-  const localMIds = new Set(data.matches.map(m => m.id));
-  const toInsertM = data.matches.filter(m => !existingMIds.has(m.id));
-  const toDeleteM = [...existingMIds].filter(id => !localMIds.has(id));
-  if(toInsertM.length) enqueueSave(() => supabase.from('matches').insert(toInsertM.map(m => ({
-    id:m.id, date:m.date, team_a:m.teamA, team_b:m.teamB,
-    score_a:m.scoreA, score_b:m.scoreB, winner:m.winner,
-    buchuda:m.buchuda, buchuda_de_re:m.buchudaDeRe, duration_sec:m.durationSec
-  }))));
-  if(toDeleteM.length) enqueueSave(() => supabase.from('matches').delete().in('id', toDeleteM));
+  api('savePlayers', {players: data.players.filter(p => p.id)});
+  api('saveMatches', {matches: data.matches.filter(m => m.id)});
 }
 
-async function deleteMatchSupabase(id){
+async function deleteMatchServer(id){
   data.matches = data.matches.filter(m => m.id !== id);
   saveLocal();
-  if(supabase) enqueueSave(() => supabase.from('matches').delete().eq('id', id));
+  api('saveMatches', {matches: data.matches});
   renderHistory();
 }
 
-async function deletePlayerSupabase(id){
+async function deletePlayerServer(id){
   if(!confirm('Remover este jogador? O hist\u00f3rico de partidas ser\u00e1 mantido.')) return;
   data.players = data.players.filter(p=>p.id!==id);
   saveLocal();
-  if(supabase) enqueueSave(() => supabase.from('players').delete().eq('id', id));
+  api('savePlayers', {players: data.players});
   renderPlayers();
 }
 
@@ -172,35 +142,22 @@ function showView(id){
   if(id==='ranking') renderRanking();
 }
 
-/* ---------- ADMIN (Supabase Auth) ---------- */
-let adminChecking = true;
-
-async function checkAdminSession(){
-  if(!supabase){ admin = false; adminChecking = false; updateAdminUI(); return; }
-  const {data: {session}} = await supabase.auth.getSession();
-  admin = !!session;
-  adminChecking = false;
+/* ---------- ADMIN (API) ---------- */
+function checkAdminSession(){
+  admin = sessionStorage.getItem('duelo_admin') === '1';
   updateAdminUI();
-  renderPlayers();
 }
 
 function updateAdminUI(){
   document.body.classList.toggle('is-admin', admin);
-  const btn = document.getElementById('adminBtnLabel');
-  const icon = document.getElementById('adminToggleBtn').firstChild;
-  if(adminChecking){
-    btn.textContent = '...';
-    icon.textContent = '\u23f3 ';
-  } else {
-    btn.textContent = admin ? 'Sair' : 'Admin';
-    icon.textContent = admin ? '\U0001f513 ' : '\U0001f512 ';
-  }
+  document.getElementById('adminBtnLabel').textContent = admin ? 'Sair' : 'Admin';
+  document.getElementById('adminToggleBtn').firstChild.textContent = admin ? '\u{1F513} ' : '\u{1F512} ';
 }
 
-document.getElementById('adminToggleBtn').addEventListener('click', async ()=>{
+document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
   if(admin){
-    await supabase.auth.signOut();
     admin = false;
+    sessionStorage.removeItem('duelo_admin');
     updateAdminUI();
     renderPlayers();
   } else {
@@ -242,17 +199,17 @@ async function submitAdminLogin(){
   const pass = document.getElementById('adminPasswordInput').value;
   const err = document.getElementById('adminError');
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
-  if(!supabase){ err.textContent = 'Supabase n\u00e3o dispon\u00edvel.'; return; }
-  const {error} = await supabase.auth.signInWithPassword({email, password: pass});
-  if(error){
-    err.textContent = error.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos.' : error.message;
+  const res = await api('adminLogin', {email, password: pass});
+  if(res && res.ok){
+    admin = true;
+    sessionStorage.setItem('duelo_admin','1');
+    updateAdminUI();
+    closeAdminModal();
+    renderPlayers();
+  } else {
+    err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
     shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
-    return;
   }
-  admin = true;
-  updateAdminUI();
-  closeAdminModal();
-  renderPlayers();
 }
 
 async function submitAdminRegister(){
@@ -262,19 +219,18 @@ async function submitAdminRegister(){
   const err = document.getElementById('adminRegError');
   if(!email || !pass || !confirm){ err.textContent = 'Preencha todos os campos.'; return; }
   if(!email.includes('@')){ err.textContent = 'Informe um e-mail v\u00e1lido.'; return; }
-  if(pass.length < 6){ err.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
+  if(pass.length < 4){ err.textContent = 'Senha deve ter ao menos 4 caracteres.'; return; }
   if(pass !== confirm){ err.textContent = 'Senhas n\u00e3o conferem.'; return; }
-  if(!supabase){ err.textContent = 'Supabase n\u00e3o dispon\u00edvel.'; return; }
-  const {error} = await supabase.auth.signUp({email, password: pass});
-  if(error){
-    err.textContent = error.message;
-    return;
+  const res = await api('adminRegister', {email, password: pass});
+  if(res && res.ok){
+    admin = true;
+    sessionStorage.setItem('duelo_admin','1');
+    updateAdminUI();
+    closeAdminModal();
+    renderPlayers();
+  } else {
+    err.textContent = (res && res.error) || 'Erro ao criar conta.';
   }
-  alert('Conta criada! Verifique seu e-mail para confirmar o cadastro (ou j\u00e1 pode estar logado).');
-  admin = true;
-  updateAdminUI();
-  closeAdminModal();
-  renderPlayers();
 }
 
 function shakeElement(el){
@@ -298,7 +254,7 @@ function renderHome(){
     const teamAName = `${playerName(m.teamA[0])} &amp; ${playerName(m.teamA[1])}`;
     const teamBName = `${playerName(m.teamB[0])} &amp; ${playerName(m.teamB[1])}`;
     return `<div class="recent-item">
-      <span class="teams">${m.winner==='A'?'\U0001f451 ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'\U0001f451 ':''}${teamBName}</span>
+      <span class="teams">${m.winner==='A'?'\u{0001f451} ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'\u{0001f451} ':''}${teamBName}</span>
       <span class="score">${m.scoreA}x${m.scoreB}</span>
     </div>`;
   }).join('');
@@ -309,7 +265,7 @@ function renderPlayers(){
   const list = document.getElementById('playersList');
   if(data.players.length===0){
     list.innerHTML = `<div class="empty-state">
-      <div class="big-emoji">\U0001f0a0</div>
+      <div class="big-emoji">\u{0001f0a0}</div>
       <p>Nenhum jogador cadastrado.${admin?' Adicione o primeiro jogador para come\u00e7ar.':' Pe\u00e7a ao admin para cadastrar os jogadores.'}</p>
       <button class="btn btn-primary admin-only" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="openPlayerModal()">+ Adicionar Jogador</button>
     </div>`;
@@ -324,7 +280,7 @@ function renderPlayers(){
       </div>
       <div class="player-actions admin-only flex">
         <button class="icon-btn" onclick="openPlayerModal('${p.id}')" title="Editar">\u270e</button>
-        <button class="icon-btn" onclick="deletePlayer('${p.id}')" title="Remover">\U0001f5d1</button>
+        <button class="icon-btn" onclick="deletePlayer('${p.id}')" title="Remover">\u{0001f5d1}</button>
       </div>
     </div>
   `).join('');
@@ -340,11 +296,11 @@ function openPlayerModal(id){
     document.getElementById('playerModalTitle').textContent = 'Editar Jogador';
     document.getElementById('playerName').value = p.name || '';
     pendingPhoto = p.photo || null;
-    document.getElementById('photoPreview').innerHTML = p.photo ? `<img src="${p.photo}">` : '\U0001f4f7';
+    document.getElementById('photoPreview').innerHTML = p.photo ? `<img src="${p.photo}">` : '\u{0001f4f7}';
   } else {
     document.getElementById('playerModalTitle').textContent = 'Novo Jogador';
     document.getElementById('playerName').value = '';
-    document.getElementById('photoPreview').innerHTML = '\U0001f4f7';
+    document.getElementById('photoPreview').innerHTML = '\u{0001f4f7}';
   }
   document.getElementById('playerModalOverlay').classList.add('open');
 }
@@ -386,7 +342,7 @@ function savePlayer(){
   renderPlayers();
 }
 function deletePlayer(id){
-  deletePlayerSupabase(id);
+  deletePlayerServer(id);
 }
 
 /* ---------- MATCH SETUP ---------- */
@@ -398,7 +354,7 @@ function renderMatchSetup(){
 
   if(data.players.length < 4){
     document.getElementById('matchSetupWrap').innerHTML = `<div class="empty-state">
-      <div class="big-emoji">\U0001f0e2</div>
+      <div class="big-emoji">\u{0001f0e2}</div>
       <p>\u00c9 preciso ao menos 4 jogadores cadastrados para iniciar um duelo (2 contra 2).</p>
       <button class="btn btn-secondary" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="showView('players')">Ver Jogadores</button>
     </div>`;
@@ -452,10 +408,10 @@ function renderLiveMatch(){
     const buchudaDeRePossible = loserScore === 5;
     resultHTML = `
       <div class="result-panel">
-        <div class="win-tag">\U0001f451 ${winName} venceu!</div>
+        <div class="win-tag">\u{0001f451} ${winName} venceu!</div>
         <div class="badges">
-          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">\U0001f0e2 Buchuda${bActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\U0001f0e2 Buchuda</span>`}
-          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">\U0001f0e2 Buchuda de r\u00e9${reActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\U0001f0e2 Buchuda de r\u00e9</span>`}
+          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">\u{0001f0e2} Buchuda${bActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\u{0001f0e2} Buchuda</span>`}
+          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">\u{0001f0e2} Buchuda de r\u00e9${reActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\u{0001f0e2} Buchuda de r\u00e9</span>`}
         </div>
         <p class="subtle" style="text-align:center;margin:4px 0 12px;">Clique nos selos acima para marcar/desmarcar</p>
         <div class="btn-row">
@@ -612,7 +568,7 @@ function renderHistory(){
   const list = document.getElementById('historyList');
   const matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(matches.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\U0001f4dc</div><p>Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.</p></div>`;
     return;
   }
   list.innerHTML = matches.map(m=>{
@@ -622,17 +578,17 @@ function renderHistory(){
       <div class="date-row">
         <span>${fmtDate(m.date)}</span>
         <span style="display:flex;align-items:center;gap:8px;">
-          <button class="icon-btn admin-only" onclick="deleteMatch('${m.id}')" title="Remover duelo" style="width:28px;height:28px;font-size:12px;">\U0001f5d1</button>
+          <button class="icon-btn admin-only" onclick="deleteMatch('${m.id}')" title="Remover duelo" style="width:28px;height:28px;font-size:12px;">\u{0001f5d1}</button>
         </span>
       </div>
       <div class="match-row">
-        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\U0001f451 ':''}${teamAName}</div>
+        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\u{0001f451} ':''}${teamAName}</div>
         <div class="mid-score">${m.scoreA} x ${m.scoreB}</div>
-        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' \U0001f451':''}</div>
+        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' \u{0001f451}':''}</div>
       </div>
       ${(m.buchuda || m.buchudaDeRe) ? `<div class="badges">
-        ${m.buchuda?'<span class="badge buchuda">\U0001f0e2 Buchuda</span>':''}
-        ${m.buchudaDeRe?'<span class="badge re">\U0001f0e2 Buchuda de r\u00e9</span>':''}
+        ${m.buchuda?'<span class="badge buchuda">\u{0001f0e2} Buchuda</span>':''}
+        ${m.buchudaDeRe?'<span class="badge re">\u{0001f0e2} Buchuda de r\u00e9</span>':''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -647,7 +603,7 @@ function deleteMatch(id){
   if(!confirm(`Remover este duelo?\n${teamAName} ${match.scoreA}x${match.scoreB} ${teamBName}`)) return;
   data.matches = data.matches.filter(m=>m.id!==id);
   saveLocal();
-  if(supabase) enqueueSave(() => supabase.from('matches').delete().eq('id', id));
+  api('saveMatches', {matches: data.matches});
   renderHistory();
 }
 
@@ -734,7 +690,7 @@ function renderRanking(){
 
   const list = document.getElementById('rankingList');
   if(rows.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\U0001f3c6</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
     return;
   }
   list.innerHTML = rows.map((r,i)=>{
@@ -744,9 +700,9 @@ function renderRanking(){
     const name2 = p2 ? p2.name : 'Jogador removido';
     const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
     const extras = [];
-    if(r.buchudasFeitas) extras.push(`\U0001f0e2 ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
-    if(r.buchudaDeRe) extras.push(`\U0001f0e2 ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
-    if(r.buchudasSofridas) extras.push(`\U0001f62c ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
+    if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
+    if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
+    if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
       <div style="display:flex;align-items:center;gap:6px;">
