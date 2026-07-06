@@ -395,9 +395,9 @@ function renderPlayers(){
         <div class="name">${escapeHtml(p.name)}</div>
         <div class="meta">Jogador</div>
       </div>
-      <div class="player-actions admin-only flex">
-        <button class="icon-btn" onclick="openPlayerModal('${p.id}')" title="Editar">\u270e</button>
-        <button class="icon-btn" onclick="deletePlayer('${p.id}')" title="Remover">\u{0001f5d1}</button>
+      <div class="player-actions flex">
+        <button class="icon-btn role-hidden" onclick="openPlayerModal('${p.id}')" title="Editar">\u270e</button>
+        <button class="icon-btn admin-only" onclick="deletePlayer('${p.id}')" title="Remover">\u{0001f5d1}</button>
       </div>
     </div>
   `).join('');
@@ -405,7 +405,6 @@ function renderPlayers(){
 
 function openPlayerModal(id){
   if(!user) return;
-  if(id && user.role !== 'admin') return;
   editingPlayerId = id || null;
   pendingPhoto = null;
   document.getElementById('playerFormError').textContent = '';
@@ -456,7 +455,6 @@ function savePlayer(){
     return;
   }
   if(editingPlayerId){
-    if(user.role !== 'admin') return;
     const p = playerById(editingPlayerId);
     p.name = name; p.photo = pendingPhoto;
   } else {
