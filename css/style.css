@@ -261,3 +261,21 @@ nav.bottom-nav{
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+
+@media (min-width:560px){
+  body{
+    background:radial-gradient(circle at 50% 0%, #1b2030 0%, #05070a 80%);
+  }
+  .app-shell{
+    margin:20px 0;
+    border-radius:32px;
+    max-height:calc(100vh - 40px);
+    overflow:hidden;
+    border:1px solid var(--border);
+    box-shadow:0 20px 80px rgba(0,0,0,.7);
+  }
+  nav.bottom-nav{
+    max-width:518px;
+    border-radius:0 0 32px 32px;
+  }
+}
