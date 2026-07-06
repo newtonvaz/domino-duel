@@ -30,15 +30,14 @@ function saveLocal(){
 }
 
 async function loadData(){
-  loadLocal();
   const playersRemote = await api('listPlayers');
   const matchesRemote = await api('listMatches');
-  if(playersRemote && Array.isArray(playersRemote) && playersRemote.length > 0){
+  if(playersRemote && Array.isArray(playersRemote)){
     data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
-  } else if(data.players.length > 0) {
-    api('savePlayers', {players: data.players.filter(p => p.id)});
+  } else {
+    loadLocal();
   }
-  if(matchesRemote && Array.isArray(matchesRemote) && matchesRemote.length > 0){
+  if(matchesRemote && Array.isArray(matchesRemote)){
     data.matches = matchesRemote.map(m => ({
       id: m.id, date: m.date,
       teamA: m.team_a || m.teamA,
@@ -51,8 +50,8 @@ async function loadData(){
       durationSec: m.duration_sec ?? m.durationSec
     }));
     saveLocal();
-  } else if(data.matches.length > 0) {
-    api('saveMatches', {matches: data.matches.filter(m => m.id)});
+  } else {
+    loadLocal();
   }
 }
 
