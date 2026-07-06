@@ -1,4 +1,4 @@
-const CACHE = 'domino-v1';
+const CACHE = 'domino-v2';
 
 const STATIC = [
   '/',
@@ -11,14 +11,18 @@ const STATIC = [
 ];
 
 self.addEventListener('install', e => {
+  self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(c => c.addAll(STATIC))
   );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    Promise.all([
+      caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))),
+      self.clients.claim()
+    ])
   );
 });
 
@@ -27,14 +31,9 @@ self.addEventListener('fetch', e => {
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(networkFirst(e.request));
   } else {
-    e.respondWith(cacheFirst(e.request));
+    e.respondWith(networkFirst(e.request));
   }
 });
-
-async function cacheFirst(req) {
-  const cached = await caches.match(req);
-  return cached || fetch(req);
-}
 
 async function networkFirst(req) {
   try {
