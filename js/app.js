@@ -162,7 +162,7 @@ function updateAuthUI(){
 
 document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
   if(user){
-    openAdminModal();
+    logout();
   } else {
     openAdminModal();
   }
@@ -297,7 +297,7 @@ async function rejectUser(id){
 function logout(){
   user = null;
   sessionStorage.removeItem('duelo_user');
-  closeAdminModal();
+  try { closeAdminModal(); } catch(e) {}
   location.reload();
 }
 
