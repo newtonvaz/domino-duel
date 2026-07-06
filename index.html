@@ -21,7 +21,10 @@
       <div class="tile-logo" id="logoTile"></div>
       <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
     </div>
-    <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Login</span></button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="admin-toggle admin-only" id="manageUsersBtn" onclick="openAdminModal()" title="Gerenciar usu\u00e1rios">\u2699</button>
+      <button class="admin-toggle" id="adminToggleBtn">\u{1F512} <span id="adminBtnLabel">Login</span></button>
+    </div>
   </header>
 
   <main>
@@ -160,8 +163,8 @@
     </div>
 
     <div id="adminPendingSection" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
-      <h4 style="margin:0 0 10px;">Usu\u00e1rios Pendentes</h4>
-      <div id="pendingUsersList" style="max-height:200px;overflow-y:auto;"></div>
+      <h4 style="margin:0 0 10px;">Gerenciar Usu\u00e1rios</h4>
+      <div id="usersList" style="max-height:250px;overflow-y:auto;"></div>
     </div>
     <button class="btn btn-secondary" id="logoutBtn" style="display:none;margin-top:12px;" onclick="logout()">Sair</button>
   </div>

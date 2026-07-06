@@ -186,7 +186,7 @@ function openAdminModal(){
     document.getElementById('logoutBtn').style.display = 'block';
     if(user.role === 'admin'){
       document.getElementById('adminPendingSection').style.display = 'block';
-      loadPendingUsers();
+      loadUsers();
     }
   } else {
     showAdminLogin();
@@ -229,7 +229,7 @@ async function submitLogin(){
     closeAdminModal();
     renderPlayers();
     if(res.role === 'admin'){
-      loadPendingUsers();
+      loadUsers();
     }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
@@ -267,31 +267,52 @@ function shakeElement(el){
   el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
 }
 
-async function loadPendingUsers(){
-  const list = document.getElementById('pendingUsersList');
+async function loadUsers(){
+  const list = document.getElementById('usersList');
   if(!list) return;
-  const res = await api('listPending');
+  const res = await api('listUsers');
   if(!Array.isArray(res)){ list.innerHTML = '<p class="subtle">Erro ao carregar.</p>'; return; }
-  if(res.length === 0){ list.innerHTML = '<p class="subtle">Nenhum usu\u00e1rio pendente.</p>'; return; }
-  list.innerHTML = res.map(u => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-      <span>${escapeHtml(u.email)}</span>
+  list.innerHTML = res.map(u => {
+    const isPending = u.status === 'pending';
+    const badge = isPending ? '<span style="color:var(--gold);font-size:11px;"> (pendente)</span>' : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px;">
       <div>
-        <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="approveUser('${u.id}')">Aprovar</button>
-        <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="rejectUser('${u.id}')">Rejeitar</button>
+        <strong>${escapeHtml(u.email)}</strong>${badge}
+        <div style="font-size:11px;color:var(--text-muted);">${u.role === 'admin' ? 'Admin' : 'Padr\u00e3o'} ${isPending ? '' : '\u00b7 ' + u.created_at?.slice(0,10)}</div>
       </div>
-    </div>
-  `).join('');
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${isPending ? `
+          <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="approveUser('${u.id}')">Aprovar</button>
+          <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="rejectUser('${u.id}')">Rejeitar</button>
+        ` : `
+          <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px;" onclick="updateUserRole('${u.id}','${u.role === 'admin' ? 'user' : 'admin'}')">${u.role === 'admin' ? 'Rebaixar' : 'Promover'}</button>
+          <button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="deleteUser('${u.id}')">Excluir</button>
+        `}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function approveUser(id){
   await api('approveUser', {id});
-  loadPendingUsers();
+  loadUsers();
 }
 
 async function rejectUser(id){
   await api('rejectUser', {id});
-  loadPendingUsers();
+  loadUsers();
+}
+
+async function updateUserRole(id, role){
+  if(!confirm(`Tem certeza que deseja ${role === 'admin' ? 'promover' : 'rebaixar'} este usu\u00e1rio?`)) return;
+  await api('updateUserRole', {id, role});
+  loadUsers();
+}
+
+async function deleteUser(id){
+  if(!confirm('Excluir este usu\u00e1rio permanentemente?')) return;
+  await api('deleteUser', {id});
+  loadUsers();
 }
 
 function logout(){

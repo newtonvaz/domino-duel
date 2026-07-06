@@ -124,8 +124,8 @@ switch ($action) {
         echo json_encode(['ok' => true, 'email' => $user['email'], 'role' => $user['role']]);
         break;
 
-    case 'listPending':
-        $stmt = $pdo->query("SELECT id, email, created_at FROM users WHERE status = 'pending' ORDER BY created_at");
+    case 'listUsers':
+        $stmt = $pdo->query('SELECT id, email, role, status, created_at FROM users ORDER BY created_at');
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
         break;
 
@@ -138,7 +138,27 @@ switch ($action) {
 
     case 'rejectUser':
         $input = jsonInput();
-        $stmt = $pdo->prepare("UPDATE users SET status = 'rejected' WHERE id = ? AND status = 'pending'");
+        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$input['id']]);
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'updateUserRole':
+        $input = jsonInput();
+        $allowed = ['admin', 'user'];
+        if (!in_array($input['role'], $allowed)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid role']);
+            break;
+        }
+        $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
+        $stmt->execute([$input['role'], $input['id']]);
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'deleteUser':
+        $input = jsonInput();
+        $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
         $stmt->execute([$input['id']]);
         echo json_encode(['ok' => true]);
         break;
