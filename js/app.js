@@ -295,8 +295,7 @@ function logout(){
   sessionStorage.removeItem('duelo_user');
   updateAuthUI();
   closeAdminModal();
-  renderPlayers();
-  renderHome();
+  showView('home');
 }
 
 /* ---------- HOME ---------- */
