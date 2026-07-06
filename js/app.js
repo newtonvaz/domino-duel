@@ -450,6 +450,10 @@ function savePlayer(){
   if(!user) return;
   const name = document.getElementById('playerName').value.trim();
   if(!name){ document.getElementById('playerFormError').textContent = 'Informe o nome do jogador.'; return; }
+  if(data.players.some(p => p.id !== editingPlayerId && p.name.toLowerCase() === name.toLowerCase())){
+    document.getElementById('playerFormError').textContent = 'Este jogador j\u00e1 existe.';
+    return;
+  }
   if(editingPlayerId){
     const p = playerById(editingPlayerId);
     p.name = name; p.photo = pendingPhoto;
@@ -501,6 +505,11 @@ function startMatch(){
   const err = document.getElementById('matchSetupError');
   if(ids.some(x=>!x)){ err.textContent = 'Selecione os 4 jogadores.'; return; }
   if(new Set(ids).size !== 4){ err.textContent = 'Cada jogador s\u00f3 pode aparecer uma vez.'; return; }
+  const names = ids.map(id => playerById(id)?.name?.toLowerCase());
+  if(names[0] === names[2] || names[0] === names[3] || names[1] === names[2] || names[1] === names[3]){
+    err.textContent = 'Jogadores com o mesmo nome n\u00e3o podem estar em duplas opostas.';
+    return;
+  }
   err.textContent = '';
   matchState = {
     teamA:[a1,a2], teamB:[b1,b2],
