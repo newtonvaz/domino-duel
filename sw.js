@@ -1,4 +1,4 @@
-const CACHE = 'domino-v2';
+const CACHE = 'domino-v3';
 
 const STATIC = [
   '/',
@@ -6,6 +6,7 @@ const STATIC = [
   '/css/style.css',
   '/js/app.js',
   '/manifest.json',
+  '/icons/favicon.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ];
