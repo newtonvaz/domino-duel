@@ -9,10 +9,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$host = getenv('DB_HOST') ?: 'sql.freedev.app';
-$db   = getenv('DB_NAME') ?: 'dominoduel';
-$user = getenv('DB_USER') ?: 'dominoduel';
-$pass = getenv('DB_PASS') ?: 'your_password_here';
+$host = getenv('DB_HOST') ?: 'localhost';
+$db   = getenv('DB_NAME') ?: 'SEU_BANCO_AQUI';
+$user = getenv('DB_USER') ?: 'SEU_USUARIO_AQUI';
+$pass = getenv('DB_PASS') ?: 'SUA_SENHA_AQUI';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
