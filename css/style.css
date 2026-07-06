@@ -43,7 +43,7 @@ header.top{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:16px 18px 12px;
+  padding:20px 18px 14px;
   border-bottom:1px solid var(--border);
 }
 .brand{display:flex;align-items:center;gap:10px;}

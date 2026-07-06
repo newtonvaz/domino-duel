@@ -151,7 +151,7 @@ function checkAdminSession(){
 
 function updateAdminUI(){
   document.body.classList.toggle('is-admin', admin);
-  document.getElementById('adminBtnLabel').textContent = admin ? 'Sair' : 'Admin';
+  document.getElementById('adminBtnLabel').textContent = admin ? 'Sair' : 'Login';
   document.getElementById('adminToggleBtn').firstChild.textContent = admin ? '\u{1F513} ' : '\u{1F512} ';
 }
 
