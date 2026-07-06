@@ -198,8 +198,8 @@ function closeAdminModal(){
 function showAdminLogin(){
   document.getElementById('adminLoginForm').style.display = 'block';
   document.getElementById('adminRegisterForm').style.display = 'none';
-  document.getElementById('adminModalTitle').textContent = 'Acesso Admin';
-  document.getElementById('adminModalSub').textContent = 'Entre com seu e-mail e senha de admin.';
+  document.getElementById('adminModalTitle').textContent = 'Login do Usu\u00e1rio';
+  document.getElementById('adminModalSub').textContent = 'Entre com o seu e-mail e senha ou crie uma conta.';
   document.getElementById('adminError').textContent = '';
 }
 function showAdminRegister(){
