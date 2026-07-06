@@ -145,7 +145,7 @@ function showView(id){
 
 /* ---------- ADMIN (API) ---------- */
 function checkSession(){
-  const raw = sessionStorage.getItem('duelo_user');
+  const raw = localStorage.getItem('duelo_user');
   if(raw) user = JSON.parse(raw);
   else user = null;
   updateAuthUI();
@@ -218,7 +218,7 @@ async function submitLogin(){
   const res = await api('login', {email, password: pass});
   if(res && res.ok){
     user = {email: res.email, role: res.role};
-    sessionStorage.setItem('duelo_user', JSON.stringify(user));
+    localStorage.setItem('duelo_user', JSON.stringify(user));
     updateAuthUI();
     closeAdminModal();
     renderPlayers();
@@ -244,7 +244,7 @@ async function submitRegister(){
   if(res && res.ok){
     if(res.role === 'admin'){
       user = {email: res.email, role: 'admin'};
-      sessionStorage.setItem('duelo_user', JSON.stringify(user));
+      localStorage.setItem('duelo_user', JSON.stringify(user));
       updateAuthUI();
       closeAdminModal();
       renderPlayers();
@@ -273,7 +273,7 @@ async function rejectUser(id){
 
 function logout(){
   user = null;
-  sessionStorage.removeItem('duelo_user');
+  localStorage.removeItem('duelo_user');
   try { closeAdminModal(); } catch(e) {}
   location.reload();
 }
