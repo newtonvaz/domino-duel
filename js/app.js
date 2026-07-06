@@ -132,6 +132,7 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>showView(btn.dataset.view));
 });
 function showView(id){
+  if(id==='match' && !admin) return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===id));
@@ -287,6 +288,7 @@ function renderPlayers(){
 }
 
 function openPlayerModal(id){
+  if(!admin) return;
   editingPlayerId = id || null;
   pendingPhoto = null;
   document.getElementById('playerFormError').textContent = '';
@@ -329,6 +331,7 @@ document.getElementById('photoInput').addEventListener('change', (e)=>{
 });
 
 function savePlayer(){
+  if(!admin) return;
   const name = document.getElementById('playerName').value.trim();
   if(!name){ document.getElementById('playerFormError').textContent = 'Informe o nome do jogador.'; return; }
   if(editingPlayerId){
@@ -342,6 +345,7 @@ function savePlayer(){
   renderPlayers();
 }
 function deletePlayer(id){
+  if(!admin) return;
   deletePlayerServer(id);
 }
 
@@ -372,6 +376,7 @@ function renderMatchSetup(){
 }
 
 function startMatch(){
+  if(!admin) return;
   const a1 = document.getElementById('selA1').value;
   const a2 = document.getElementById('selA2').value;
   const b1 = document.getElementById('selB1').value;
@@ -452,6 +457,7 @@ function renderLiveMatch(){
 }
 
 function adjustScore(team, delta){
+  if(!admin) return;
   if(!matchState) return;
   const key = team==='A' ? 'scoreA' : 'scoreB';
   const newVal = matchState[key] + delta;
@@ -469,6 +475,7 @@ function adjustScore(team, delta){
 }
 
 function editScore(team){
+  if(!admin) return;
   if(!matchState) return;
   const key = team==='A' ? 'scoreA' : 'scoreB';
   const current = matchState[key];
@@ -515,6 +522,7 @@ function cancelMatch(){
   renderMatchSetup();
 }
 function discardMatch(){
+  if(!admin) return;
   matchState = null;
   renderMatchSetup();
 }
@@ -536,6 +544,7 @@ function computeResult(){
 }
 
 function toggleResultFlag(flag){
+  if(!admin) return;
   if(!matchState || !matchState.finished) return;
   const loserScore = matchState.scoreA===6 ? matchState.scoreB : matchState.scoreA;
   if(flag === 'buchuda' && loserScore !== 0) return;
@@ -545,6 +554,7 @@ function toggleResultFlag(flag){
   renderLiveMatch();
 }
 function saveMatch(){
+  if(!admin) return;
   const r = matchState.result;
   data.matches.push({
     id: uid('m'),

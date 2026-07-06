@@ -153,6 +153,7 @@ p.subtle{color:var(--text-muted);font-size:13px;margin:-8px 0 16px;}
 .admin-only{display:none;}
 body.is-admin .admin-only{display:inherit;}
 body.is-admin .admin-only.flex{display:flex;}
+body.is-admin .nav-btn.admin-only{display:flex;}
 
 .player-card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:10px;}
 .avatar{border-radius:50%;object-fit:cover;flex-shrink:0;}
