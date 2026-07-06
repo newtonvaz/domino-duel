@@ -83,6 +83,7 @@ let pendingPhoto = null;
 let editingPlayerId = null;
 let rankingPeriod = 'week';
 let periodOffset = 0;
+let pollTimer = null;
 
 /* ---------- HELPERS ---------- */
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
@@ -149,6 +150,7 @@ function checkSession(){
   if(raw) user = JSON.parse(raw);
   else user = null;
   updateAuthUI();
+  if(user) startPolling();
 }
 
 function updateAuthUI(){
@@ -222,6 +224,7 @@ async function submitLogin(){
     updateAuthUI();
     closeAdminModal();
     renderPlayers();
+    startPolling();
     if(res.role === 'admin'){
       renderPendingUsers();
     }
@@ -248,6 +251,7 @@ async function submitRegister(){
       updateAuthUI();
       closeAdminModal();
       renderPlayers();
+      startPolling();
     } else {
       err.textContent = 'Conta criada! Aguarde aprova\u00e7\u00e3o do admin.';
       err.style.color = 'var(--green)';
@@ -272,10 +276,41 @@ async function rejectUser(id){
 }
 
 function logout(){
+  stopPolling();
   user = null;
   localStorage.removeItem('duelo_user');
   try { closeAdminModal(); } catch(e) {}
   location.reload();
+}
+
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    const playersRemote = await api('listPlayers');
+    const matchesRemote = await api('listMatches');
+    if(playersRemote && Array.isArray(playersRemote)){
+      data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
+    }
+    if(matchesRemote && Array.isArray(matchesRemote)){
+      data.matches = matchesRemote.map(m => ({
+        id: m.id, date: m.date,
+        teamA: m.team_a || m.teamA,
+        teamB: m.team_b || m.teamB,
+        scoreA: m.score_a ?? m.scoreA,
+        scoreB: m.score_b ?? m.scoreB,
+        winner: m.winner,
+        buchuda: m.buchuda,
+        buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
+        durationSec: m.duration_sec ?? m.durationSec
+      }));
+    }
+    document.querySelector('.view.active')?.id === 'view-home' && renderHome();
+    renderPendingUsers();
+  }, 10000);
+}
+
+function stopPolling(){
+  if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
 }
 
 /* ---------- HOME ---------- */
