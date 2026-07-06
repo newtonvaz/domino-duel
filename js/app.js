@@ -70,6 +70,7 @@ async function deleteMatchServer(id){
 }
 
 async function deletePlayerServer(id){
+  if(!user || user.role !== 'admin') return;
   if(!confirm('Remover este jogador? O hist\u00f3rico de partidas ser\u00e1 mantido.')) return;
   data.players = data.players.filter(p=>p.id!==id);
   saveLocal();
@@ -77,7 +78,7 @@ async function deletePlayerServer(id){
   renderPlayers();
 }
 
-let admin = false;
+let user = null;
 let matchState = null;
 let pendingPhoto = null;
 let editingPlayerId = null;
@@ -132,7 +133,7 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>showView(btn.dataset.view));
 });
 function showView(id){
-  if(id==='match' && !admin) return;
+  if(id==='match' && !user) return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===id));
@@ -144,23 +145,25 @@ function showView(id){
 }
 
 /* ---------- ADMIN (API) ---------- */
-function checkAdminSession(){
-  admin = sessionStorage.getItem('duelo_admin') === '1';
-  updateAdminUI();
+function checkSession(){
+  const raw = sessionStorage.getItem('duelo_user');
+  if(raw) user = JSON.parse(raw);
+  else user = null;
+  updateAuthUI();
 }
 
-function updateAdminUI(){
-  document.body.classList.toggle('is-admin', admin);
-  document.getElementById('adminBtnLabel').textContent = admin ? 'Sair' : 'Login';
-  document.getElementById('adminToggleBtn').firstChild.textContent = admin ? '\u{1F513} ' : '\u{1F512} ';
+function updateAuthUI(){
+  document.body.classList.remove('is-admin', 'is-user');
+  if(user){
+    document.body.classList.add('is-' + user.role);
+  }
+  document.getElementById('adminBtnLabel').textContent = user ? 'Sair' : 'Login';
+  document.getElementById('adminToggleBtn').firstChild.textContent = user ? '\u{1F513} ' : '\u{1F512} ';
 }
 
 document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
-  if(admin){
-    admin = false;
-    sessionStorage.removeItem('duelo_admin');
-    updateAdminUI();
-    renderPlayers();
+  if(user){
+    openAdminModal();
   } else {
     openAdminModal();
   }
@@ -174,9 +177,23 @@ function openAdminModal(){
   document.getElementById('adminRegEmailInput').value = '';
   document.getElementById('adminRegPasswordInput').value = '';
   document.getElementById('adminRegConfirmInput').value = '';
-  showAdminLogin();
+  document.getElementById('adminPendingSection').style.display = 'none';
+  document.getElementById('logoutBtn').style.display = 'none';
+  if(user){
+    document.getElementById('adminModalTitle').textContent = user.email;
+    document.getElementById('adminModalSub').textContent = '';
+    document.getElementById('adminLoginForm').style.display = 'none';
+    document.getElementById('adminRegisterForm').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'block';
+    if(user.role === 'admin'){
+      document.getElementById('adminPendingSection').style.display = 'block';
+      loadPendingUsers();
+    }
+  } else {
+    showAdminLogin();
+  }
   document.getElementById('adminModalOverlay').classList.add('open');
-  setTimeout(()=>document.getElementById('adminEmailInput').focus(), 50);
+  if(!user) setTimeout(()=>document.getElementById('adminEmailInput').focus(), 50);
 }
 function closeAdminModal(){ document.getElementById('adminModalOverlay').classList.remove('open'); }
 
@@ -195,25 +212,28 @@ function showAdminRegister(){
   document.getElementById('adminRegError').textContent = '';
 }
 
-async function submitAdminLogin(){
+async function submitLogin(){
   const email = document.getElementById('adminEmailInput').value.trim();
   const pass = document.getElementById('adminPasswordInput').value;
   const err = document.getElementById('adminError');
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
-  const res = await api('adminLogin', {email, password: pass});
+  const res = await api('login', {email, password: pass});
   if(res && res.ok){
-    admin = true;
-    sessionStorage.setItem('duelo_admin','1');
-    updateAdminUI();
+    user = {email: res.email, role: res.role};
+    sessionStorage.setItem('duelo_user', JSON.stringify(user));
+    updateAuthUI();
     closeAdminModal();
     renderPlayers();
+    if(res.role === 'admin'){
+      loadPendingUsers();
+    }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
     shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
   }
 }
 
-async function submitAdminRegister(){
+async function submitRegister(){
   const email = document.getElementById('adminRegEmailInput').value.trim();
   const pass = document.getElementById('adminRegPasswordInput').value;
   const confirm = document.getElementById('adminRegConfirmInput').value;
@@ -222,13 +242,18 @@ async function submitAdminRegister(){
   if(!email.includes('@')){ err.textContent = 'Informe um e-mail v\u00e1lido.'; return; }
   if(pass.length < 4){ err.textContent = 'Senha deve ter ao menos 4 caracteres.'; return; }
   if(pass !== confirm){ err.textContent = 'Senhas n\u00e3o conferem.'; return; }
-  const res = await api('adminRegister', {email, password: pass});
+  const res = await api('register', {email, password: pass});
   if(res && res.ok){
-    admin = true;
-    sessionStorage.setItem('duelo_admin','1');
-    updateAdminUI();
-    closeAdminModal();
-    renderPlayers();
+    if(res.role === 'admin'){
+      user = {email: res.email, role: 'admin'};
+      sessionStorage.setItem('duelo_user', JSON.stringify(user));
+      updateAuthUI();
+      closeAdminModal();
+      renderPlayers();
+    } else {
+      err.textContent = 'Conta criada! Aguarde aprova\u00e7\u00e3o do admin.';
+      err.style.color = 'var(--green)';
+    }
   } else {
     err.textContent = (res && res.error) || 'Erro ao criar conta.';
   }
@@ -236,6 +261,42 @@ async function submitAdminRegister(){
 
 function shakeElement(el){
   el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+}
+
+async function loadPendingUsers(){
+  const list = document.getElementById('pendingUsersList');
+  if(!list) return;
+  const res = await api('listPending');
+  if(!Array.isArray(res)){ list.innerHTML = '<p class="subtle">Erro ao carregar.</p>'; return; }
+  if(res.length === 0){ list.innerHTML = '<p class="subtle">Nenhum usu\u00e1rio pendente.</p>'; return; }
+  list.innerHTML = res.map(u => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span>${escapeHtml(u.email)}</span>
+      <div>
+        <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="approveUser('${u.id}')">Aprovar</button>
+        <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="rejectUser('${u.id}')">Rejeitar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function approveUser(id){
+  await api('approveUser', {id});
+  loadPendingUsers();
+}
+
+async function rejectUser(id){
+  await api('rejectUser', {id});
+  loadPendingUsers();
+}
+
+function logout(){
+  user = null;
+  sessionStorage.removeItem('duelo_user');
+  updateAuthUI();
+  closeAdminModal();
+  renderPlayers();
+  renderHome();
 }
 
 /* ---------- HOME ---------- */
@@ -267,8 +328,8 @@ function renderPlayers(){
   if(data.players.length===0){
     list.innerHTML = `<div class="empty-state">
       <div class="big-emoji">\u{0001f0a0}</div>
-      <p>Nenhum jogador cadastrado.${admin?' Adicione o primeiro jogador para come\u00e7ar.':' Pe\u00e7a ao admin para cadastrar os jogadores.'}</p>
-      <button class="btn btn-primary admin-only" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="openPlayerModal()">+ Adicionar Jogador</button>
+      <p>Nenhum jogador cadastrado.${user?' Adicione o primeiro jogador para come\u00e7ar.':' Pe\u00e7a ao admin para cadastrar os jogadores.'}</p>
+      <button class="btn btn-primary role-hidden" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="openPlayerModal()">+ Adicionar Jogador</button>
     </div>`;
     return;
   }
@@ -288,7 +349,7 @@ function renderPlayers(){
 }
 
 function openPlayerModal(id){
-  if(!admin) return;
+  if(!user) return;
   editingPlayerId = id || null;
   pendingPhoto = null;
   document.getElementById('playerFormError').textContent = '';
@@ -331,7 +392,7 @@ document.getElementById('photoInput').addEventListener('change', (e)=>{
 });
 
 function savePlayer(){
-  if(!admin) return;
+  if(!user) return;
   const name = document.getElementById('playerName').value.trim();
   if(!name){ document.getElementById('playerFormError').textContent = 'Informe o nome do jogador.'; return; }
   if(editingPlayerId){
@@ -345,7 +406,7 @@ function savePlayer(){
   renderPlayers();
 }
 function deletePlayer(id){
-  if(!admin) return;
+  if(!user || user.role !== 'admin') return;
   deletePlayerServer(id);
 }
 
@@ -376,7 +437,7 @@ function renderMatchSetup(){
 }
 
 function startMatch(){
-  if(!admin) return;
+  if(!user) return;
   const a1 = document.getElementById('selA1').value;
   const a2 = document.getElementById('selA2').value;
   const b1 = document.getElementById('selB1').value;
@@ -457,7 +518,7 @@ function renderLiveMatch(){
 }
 
 function adjustScore(team, delta){
-  if(!admin) return;
+  if(!user) return;
   if(!matchState) return;
   const key = team==='A' ? 'scoreA' : 'scoreB';
   const newVal = matchState[key] + delta;
@@ -475,7 +536,7 @@ function adjustScore(team, delta){
 }
 
 function editScore(team){
-  if(!admin) return;
+  if(!user) return;
   if(!matchState) return;
   const key = team==='A' ? 'scoreA' : 'scoreB';
   const current = matchState[key];
@@ -522,7 +583,7 @@ function cancelMatch(){
   renderMatchSetup();
 }
 function discardMatch(){
-  if(!admin) return;
+  if(!user) return;
   matchState = null;
   renderMatchSetup();
 }
@@ -544,7 +605,7 @@ function computeResult(){
 }
 
 function toggleResultFlag(flag){
-  if(!admin) return;
+  if(!user) return;
   if(!matchState || !matchState.finished) return;
   const loserScore = matchState.scoreA===6 ? matchState.scoreB : matchState.scoreA;
   if(flag === 'buchuda' && loserScore !== 0) return;
@@ -554,7 +615,7 @@ function toggleResultFlag(flag){
   renderLiveMatch();
 }
 function saveMatch(){
-  if(!admin) return;
+  if(!user) return;
   const r = matchState.result;
   data.matches.push({
     id: uid('m'),
@@ -605,7 +666,7 @@ function renderHistory(){
 }
 
 function deleteMatch(id){
-  if(!admin){ alert('Apenas admin pode remover duelos.'); return; }
+  if(!user || user.role !== 'admin'){ alert('Apenas admin pode remover duelos.'); return; }
   const match = data.matches.find(m=>m.id===id);
   if(!match) return;
   const teamAName = `${playerName(match.teamA[0])} &amp; ${playerName(match.teamA[1])}`;
@@ -730,6 +791,6 @@ function renderRanking(){
 /* ---------- INIT ---------- */
 (async function init(){
   await loadData();
-  await checkAdminSession();
+  await checkSession();
   renderHome();
 })();

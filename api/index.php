@@ -82,33 +82,65 @@ switch ($action) {
         }
         break;
 
-    /* ---------- ADMIN ---------- */
-    case 'adminLogin':
+    /* ---------- USERS ---------- */
+    case 'register':
         $input = jsonInput();
-        $stmt = $pdo->prepare('SELECT id, email, password FROM admin WHERE email = ?');
-        $stmt->execute([$input['email']]);
-        $admin = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($admin && password_verify($input['password'], $admin['password'])) {
-            echo json_encode(['ok' => true, 'email' => $admin['email']]);
-        } else {
-            http_response_code(401);
-            echo json_encode(['error' => 'E-mail ou senha incorretos.']);
-        }
-        break;
-
-    case 'adminRegister':
-        $input = jsonInput();
-        $stmt = $pdo->prepare('SELECT id FROM admin WHERE email = ?');
+        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
         $stmt->execute([$input['email']]);
         if ($stmt->fetch()) {
             http_response_code(409);
             echo json_encode(['error' => 'E-mail j\u00e1 cadastrado.']);
             break;
         }
+        $isFirst = $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() == 0;
+        $role = $isFirst ? 'admin' : 'user';
+        $status = $isFirst ? 'approved' : 'pending';
         $hash = password_hash($input['password'], PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO admin (email, password) VALUES (?, ?)');
-        $stmt->execute([$input['email'], $hash]);
-        echo json_encode(['ok' => true, 'email' => $input['email']]);
+        $stmt = $pdo->prepare('INSERT INTO users (email, password, role, status) VALUES (?, ?, ?, ?)');
+        $stmt->execute([$input['email'], $hash, $role, $status]);
+        echo json_encode(['ok' => true, 'email' => $input['email'], 'role' => $role, 'status' => $status]);
+        break;
+
+    case 'login':
+        $input = jsonInput();
+        $stmt = $pdo->prepare('SELECT id, email, password, role, status FROM users WHERE email = ?');
+        $stmt->execute([$input['email']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$user || !password_verify($input['password'], $user['password'])) {
+            http_response_code(401);
+            echo json_encode(['error' => 'E-mail ou senha incorretos.']);
+            break;
+        }
+        if ($user['status'] === 'pending') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Aguardando aprova\u00e7\u00e3o do admin.']);
+            break;
+        }
+        if ($user['status'] === 'rejected') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seu cadastro foi rejeitado.']);
+            break;
+        }
+        echo json_encode(['ok' => true, 'email' => $user['email'], 'role' => $user['role']]);
+        break;
+
+    case 'listPending':
+        $stmt = $pdo->query("SELECT id, email, created_at FROM users WHERE status = 'pending' ORDER BY created_at");
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        break;
+
+    case 'approveUser':
+        $input = jsonInput();
+        $stmt = $pdo->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$input['id']]);
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'rejectUser':
+        $input = jsonInput();
+        $stmt = $pdo->prepare("UPDATE users SET status = 'rejected' WHERE id = ? AND status = 'pending'");
+        $stmt->execute([$input['id']]);
+        echo json_encode(['ok' => true]);
         break;
 
     default:
