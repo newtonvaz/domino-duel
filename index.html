@@ -21,10 +21,7 @@
       <div class="tile-logo" id="logoTile"></div>
       <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <button class="admin-toggle admin-only" id="manageUsersBtn" onclick="openAdminModal()" title="Gerenciar usu\u00e1rios">&#9881;</button>
-      <button class="admin-toggle" id="adminToggleBtn">\u{1F512} <span id="adminBtnLabel">Login</span></button>
-    </div>
+    <button class="admin-toggle" id="adminToggleBtn">\u{1F512} <span id="adminBtnLabel">Login</span></button>
   </header>
 
   <main>
@@ -48,6 +45,11 @@
         <div class="empty-state" style="padding:16px 6px;">
           <p>Nenhuma partida registrada ainda.</p>
         </div>
+      </div>
+
+      <div class="admin-only" id="pendingSection" style="margin-top:14px;">
+        <h2 class="section-title" style="font-size:18px;">Novos usuários</h2>
+        <div class="card" id="pendingUsersList"></div>
       </div>
     </section>
 
@@ -162,10 +164,6 @@
         <button class="btn btn-primary" onclick="submitRegister()">Criar Conta</button>
     </div>
 
-    <div id="adminPendingSection" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:16px;">
-      <h4 style="margin:0 0 10px;">Gerenciar Usu\u00e1rios</h4>
-      <div id="usersList" style="max-height:250px;overflow-y:auto;"></div>
-    </div>
     <button class="btn btn-secondary" id="logoutBtn" style="display:none;margin-top:12px;" onclick="logout()">Sair</button>
   </div>
 </div>

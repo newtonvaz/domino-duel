@@ -10,9 +10,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $host = getenv('DB_HOST') ?: 'sql112.infinityfree.com';
-$db   = getenv('DB_NAME') ?: 'SEU_BANCO_AQUI';
-$user = getenv('DB_USER') ?: 'SEU_USUARIO_AQUI';
-$pass = getenv('DB_PASS') ?: 'SUA_SENHA_AQUI';
+$db   = getenv('DB_NAME') ?: 'if0_42345704_dominoduelpro';
+$user = getenv('DB_USER') ?: 'if0_42345704';
+$pass = getenv('DB_PASS') ?: '7D7la3Z0tWYMM4';
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);

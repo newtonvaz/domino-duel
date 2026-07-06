@@ -176,7 +176,6 @@ function openAdminModal(){
   document.getElementById('adminRegEmailInput').value = '';
   document.getElementById('adminRegPasswordInput').value = '';
   document.getElementById('adminRegConfirmInput').value = '';
-  document.getElementById('adminPendingSection').style.display = 'none';
   document.getElementById('logoutBtn').style.display = 'none';
   if(user){
     document.getElementById('adminModalTitle').textContent = user.email;
@@ -184,10 +183,6 @@ function openAdminModal(){
     document.getElementById('adminLoginForm').style.display = 'none';
     document.getElementById('adminRegisterForm').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'block';
-    if(user.role === 'admin'){
-      document.getElementById('adminPendingSection').style.display = 'block';
-      loadUsers();
-    }
   } else {
     showAdminLogin();
   }
@@ -196,7 +191,6 @@ function openAdminModal(){
 }
 function closeAdminModal(){
   document.getElementById('adminModalOverlay').classList.remove('open');
-  document.getElementById('adminPendingSection').style.display = 'none';
   document.getElementById('logoutBtn').style.display = 'none';
   showAdminLogin();
 }
@@ -229,7 +223,7 @@ async function submitLogin(){
     closeAdminModal();
     renderPlayers();
     if(res.role === 'admin'){
-      loadUsers();
+      renderPendingUsers();
     }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
@@ -267,52 +261,14 @@ function shakeElement(el){
   el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
 }
 
-async function loadUsers(){
-  const list = document.getElementById('usersList');
-  if(!list) return;
-  const res = await api('listUsers');
-  if(!Array.isArray(res)){ list.innerHTML = '<p class="subtle">Erro ao carregar.</p>'; return; }
-  list.innerHTML = res.map(u => {
-    const isPending = u.status === 'pending';
-    const badge = isPending ? '<span style="color:var(--gold);font-size:11px;"> (pendente)</span>' : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px;">
-      <div>
-        <strong>${escapeHtml(u.email)}</strong>${badge}
-        <div style="font-size:11px;color:var(--text-muted);">${u.role === 'admin' ? 'Admin' : 'Padr\u00e3o'} ${isPending ? '' : '\u00b7 ' + u.created_at?.slice(0,10)}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${isPending ? `
-          <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick="approveUser('${u.id}')">Aprovar</button>
-          <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="rejectUser('${u.id}')">Rejeitar</button>
-        ` : `
-          <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px;" onclick="updateUserRole('${u.id}','${u.role === 'admin' ? 'user' : 'admin'}')">${u.role === 'admin' ? 'Rebaixar' : 'Promover'}</button>
-          <button class="btn btn-danger" style="padding:4px 12px;font-size:12px;" onclick="deleteUser('${u.id}')">Excluir</button>
-        `}
-      </div>
-    </div>`;
-  }).join('');
-}
-
 async function approveUser(id){
   await api('approveUser', {id});
-  loadUsers();
+  renderPendingUsers();
 }
 
 async function rejectUser(id){
   await api('rejectUser', {id});
-  loadUsers();
-}
-
-async function updateUserRole(id, role){
-  if(!confirm(`Tem certeza que deseja ${role === 'admin' ? 'promover' : 'rebaixar'} este usu\u00e1rio?`)) return;
-  await api('updateUserRole', {id, role});
-  loadUsers();
-}
-
-async function deleteUser(id){
-  if(!confirm('Excluir este usu\u00e1rio permanentemente?')) return;
-  await api('deleteUser', {id});
-  loadUsers();
+  renderPendingUsers();
 }
 
 function logout(){
@@ -343,6 +299,35 @@ function renderHome(){
       <span class="score">${m.scoreA}x${m.scoreB}</span>
     </div>`;
   }).join('');
+  renderPendingUsers();
+}
+
+function renderPendingUsers(){
+  const sec = document.getElementById('pendingSection');
+  const list = document.getElementById('pendingUsersList');
+  if(!sec || !list) return;
+  if(!user || user.role !== 'admin'){
+    sec.style.display = 'none';
+    return;
+  }
+  api('listUsers').then(res => {
+    if(!Array.isArray(res)) return;
+    const pending = res.filter(u => u.status === 'pending');
+    if(pending.length === 0){
+      sec.style.display = 'none';
+      return;
+    }
+    sec.style.display = 'block';
+    list.innerHTML = pending.map(u => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
+        <span>${escapeHtml(u.email)}</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="approveUser('${u.id}')">\u2713</button>
+          <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="rejectUser('${u.id}')">\u2717</button>
+        </div>
+      </div>
+    `).join('');
+  });
 }
 
 /* ---------- PLAYERS ---------- */
