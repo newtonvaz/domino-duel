@@ -105,6 +105,10 @@
         <button class="period-tab" data-period="month">Mês</button>
         <button class="period-tab" data-period="all">Geral</button>
       </div>
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="duo" onclick="switchRankMode('duo')">Dupla</button>
+        <button class="mode-tab" data-mode="individual" onclick="switchRankMode('individual')">Individual</button>
+      </div>
       <div class="period-nav" id="periodNav" style="display:none;">
         <button onclick="shiftPeriod(-1)">‹</button>
         <span id="periodLabel"></span>

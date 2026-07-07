@@ -769,6 +769,12 @@ document.querySelectorAll('.period-tab').forEach(tab=>{
 });
 document.querySelector('.period-tab[data-period="week"]').classList.add('active');
 
+let rankingMode = 'duo';
+function switchRankMode(mode){
+  rankingMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t=>t.classList.toggle('active', t.dataset.mode===mode));
+  renderRanking();
+}
 function shiftPeriod(dir){
   periodOffset += dir;
   if(periodOffset > 0) periodOffset = 0;
@@ -811,6 +817,53 @@ function renderRanking(){
     navEl.style.display = 'none';
   }
 
+  const list = document.getElementById('rankingList');
+  if(matches.length===0){
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
+    return;
+  }
+
+  if(rankingMode==='individual'){
+    const indStats = {};
+    function ensureInd(id){
+      if(!indStats[id]) indStats[id] = {id, jogos:0, vitorias:0, derrotas:0, pontosPro:0, pontosContra:0, buchudasFeitas:0, buchudasSofridas:0, buchudaDeRe:0};
+      return indStats[id];
+    }
+    matches.forEach(m=>{
+      const idsA = m.teamA, idsB = m.teamB;
+      idsA.forEach(id=>{ const s=ensureInd(id); s.jogos++; s.pontosPro+=m.scoreA; s.pontosContra+=m.scoreB; });
+      idsB.forEach(id=>{ const s=ensureInd(id); s.jogos++; s.pontosPro+=m.scoreB; s.pontosContra+=m.scoreA; });
+      if(m.winner==='A'){
+        idsA.forEach(id=>{ const s=ensureInd(id); s.vitorias++; if(m.buchuda) s.buchudasFeitas++; if(m.buchudaDeRe) s.buchudaDeRe++; });
+        idsB.forEach(id=>{ const s=ensureInd(id); s.derrotas++; if(m.buchuda) s.buchudasSofridas++; });
+      } else {
+        idsB.forEach(id=>{ const s=ensureInd(id); s.vitorias++; if(m.buchuda) s.buchudasFeitas++; if(m.buchudaDeRe) s.buchudaDeRe++; });
+        idsA.forEach(id=>{ const s=ensureInd(id); s.derrotas++; if(m.buchuda) s.buchudasSofridas++; });
+      }
+    });
+    const rows = Object.values(indStats).map(s=>({...s, saldo:s.pontosPro-s.pontosContra}))
+      .sort((a,b)=> b.vitorias - a.vitorias || b.saldo - a.saldo || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe);
+    list.innerHTML = rows.map((r,i)=>{
+      const p = playerById(r.id);
+      const name = p ? p.name : 'Jogador removido';
+      const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
+      const extras = [];
+      if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''}`);
+      if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} de r\u00e9`);
+      if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
+      return `<div class="rank-row">
+        <div class="pos">${i+1}</div>
+        ${avatarHTML(p, 30)}
+        <div class="rinfo">
+          <div class="name">${escapeHtml(name)}</div>
+          <div class="sub">${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}</div>
+        </div>
+        <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
   const stats = {};
   function duoKey(ids){ return [...ids].sort().join('|'); }
   function ensureDuo(key){
@@ -839,11 +892,6 @@ function renderRanking(){
     return {key, ...s};
   }).sort((a,b)=> b.vitorias - a.vitorias || b.saldo - a.saldo || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe);
 
-  const list = document.getElementById('rankingList');
-  if(rows.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
-    return;
-  }
   list.innerHTML = rows.map((r,i)=>{
     const p1 = playerById(r.ids[0]);
     const p2 = playerById(r.ids[1]);
