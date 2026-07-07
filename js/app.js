@@ -30,14 +30,11 @@ function saveLocal(){
 }
 
 async function loadData(){
-  const playersRemote = await api('listPlayers');
-  const matchesRemote = await api('listMatches');
-  if(playersRemote && Array.isArray(playersRemote)){
+  const [playersRemote, matchesRemote] = await Promise.all([
+    api('listPlayers'), api('listMatches')
+  ]);
+  if(playersRemote && Array.isArray(playersRemote) && matchesRemote && Array.isArray(matchesRemote)){
     data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
-  } else {
-    loadLocal();
-  }
-  if(matchesRemote && Array.isArray(matchesRemote)){
     data.matches = matchesRemote.map(m => ({
       id: m.id, date: m.date,
       teamA: m.team_a || m.teamA,
