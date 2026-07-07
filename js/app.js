@@ -116,7 +116,8 @@ function pipsHTML(n, small){
 }
 function fmtDate(iso){
   const d = new Date(iso);
-  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) + ' \u00e0s ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  const opt = {timeZone:'America/Sao_Paulo', day:'2-digit',month:'2-digit',year:'2-digit', hour:'2-digit',minute:'2-digit'};
+  return d.toLocaleString('pt-BR', opt);
 }
 function fmtDuration(sec){
   if(!sec && sec !== 0) return '--';
