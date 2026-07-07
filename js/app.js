@@ -116,6 +116,7 @@ function pipsHTML(n, small){
 }
 function fmtDate(iso){
   const d = new Date(iso);
+  d.setHours(d.getHours() - 2);
   const opt = {timeZone:'America/Sao_Paulo', day:'2-digit',month:'2-digit',year:'2-digit', hour:'2-digit',minute:'2-digit'};
   return d.toLocaleString('pt-BR', opt);
 }
