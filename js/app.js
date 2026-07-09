@@ -112,8 +112,8 @@ function pipsHTML(n, small){
   return `<div class="pip-grid${small?' small':''}">${cells}</div>`;
 }
 function fmtDate(iso){
-  const opt = {day:'2-digit',month:'2-digit',year:'2-digit'};
-  return new Date(iso).toLocaleDateString('pt-BR', opt);
+  const opt = {timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone, day:'2-digit',month:'2-digit',year:'2-digit', hour:'2-digit',minute:'2-digit'};
+  return new Date(iso).toLocaleString('pt-BR', opt);
 }
 function fmtDuration(sec){
   if(!sec && sec !== 0) return '--';

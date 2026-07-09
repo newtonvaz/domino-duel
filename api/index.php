@@ -48,6 +48,7 @@ switch ($action) {
             $r['score_a'] = (int) $r['score_a'];
             $r['score_b'] = (int) $r['score_b'];
             $r['duration_sec'] = $r['duration_sec'] ? (int) $r['duration_sec'] : null;
+            $r['date'] = $r['date'] ? str_replace(' ', 'T', $r['date']) : null;
         }
         echo json_encode($rows);
         break;
