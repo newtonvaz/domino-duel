@@ -782,7 +782,10 @@ function renderHistory(skipReRender){
   if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
   if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
   if(matches.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.</p></div>`;
+    const msg = historyFilter !== 'all'
+      ? `Nenhuma partida com ${historyFilter === 'buchuda' ? 'buchuda' : 'buchuda de r\u00e9'} no hist\u00f3rico.`
+      : 'Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.';
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>${msg}</p></div>`;
     return;
   }
   list.innerHTML = matches.map(m=>{
@@ -793,11 +796,18 @@ function renderHistory(skipReRender){
       ? `<input type="date" class="date-edit" value="${dateStr}" data-match-id="${m.id}" onchange="updateMatchDate(this)" max="${new Date().toISOString().slice(0,10)}">`
       : `<span>${fmtDate(m.date)}</span>`;
     const loser = m.winner === 'A' ? 'B' : 'A';
-    const loserTag = historyFilter === 'buchuda' && m.buchuda
-      ? ' <span class="badge buchuda" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda</span>'
-      : historyFilter === 're' && m.buchudaDeRe
-        ? ' <span class="badge re" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda de r\u00e9</span>'
-        : '';
+    const isFiltered = historyFilter !== 'all';
+    let loserTag = '';
+    if(isFiltered){
+      if(historyFilter === 'buchuda' && m.buchuda)
+        loserTag = ' <span class="badge buchuda" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda</span>';
+      else if(historyFilter === 're' && m.buchudaDeRe)
+        loserTag = ' <span class="badge re" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda de r\u00e9</span>';
+    }
+    const badges = !isFiltered && (m.buchuda || m.buchudaDeRe) ? `<div class="badges">
+      ${m.buchuda?'<span class="badge buchuda">\u{0001f0e2} Buchuda</span>':''}
+      ${m.buchudaDeRe?'<span class="badge re">\u{0001f0e2} Buchuda de r\u00e9</span>':''}
+    </div>` : '';
     return `<div class="hist-card">
       <div class="date-row">
         <span>${dateHtml}</span>
@@ -808,8 +818,9 @@ function renderHistory(skipReRender){
       <div class="match-row">
         <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\u{0001f451} ':''}${teamAName}${loser==='A'?loserTag:''}</div>
         <div class="mid-score">${m.scoreA} x ${m.scoreB}</div>
-        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${loser==='B'?' '+loserTag:''}${m.winner==='B'?' \u{0001f451}':''}</div>
+        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${loser==='B'?loserTag:''}${m.winner==='B'?' \u{0001f451}':''}</div>
       </div>
+      ${badges}
     </div>`;
   }).join('');
 }
