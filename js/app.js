@@ -767,10 +767,20 @@ async function saveMatch(){
 }
 
 /* ---------- HISTORY ---------- */
+let historyFilter = 'all';
+
+function setHistoryFilter(filter){
+  historyFilter = filter;
+  document.querySelectorAll('#view-history .period-tab').forEach(t=>t.classList.toggle('active', t.dataset.filter===filter));
+  renderHistory();
+}
+
 function renderHistory(skipReRender){
   if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
-  const matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
+  if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
   if(matches.length===0){
     list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.</p></div>`;
     return;
