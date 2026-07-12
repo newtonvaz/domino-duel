@@ -181,7 +181,7 @@ function showView(id){
   if(id==='home') renderHome();
   if(id==='players') renderPlayers();
   if(id==='match') renderMatchSetup();
-  if(id==='history') renderHistory();
+  if(id==='history'){ updateHistoryTabs(); renderHistory(); }
   if(id==='ranking') renderRanking();
 }
 
@@ -766,8 +766,47 @@ async function saveMatch(){
   showView('history');
 }
 
+let modoBuchuda = false;
+
+function toggleModoBuchuda(){
+  if(!user || user.role !== 'admin') return;
+  modoBuchuda = !modoBuchuda;
+  localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
+  updateBuchudaUI();
+  const activeView = document.querySelector('.view.active');
+  if(activeView){
+    const id = activeView.id.replace('view-','');
+    if(id === 'history'){ updateHistoryTabs(); renderHistory(); }
+    if(id === 'ranking') renderRanking();
+  }
+}
+
+function updateBuchudaUI(){
+  const btn = document.getElementById('buchudaToggleBtn');
+  const banner = document.getElementById('buchudaBanner');
+  if(!btn || !banner) return;
+  if(user && user.role === 'admin'){
+    btn.style.display = '';
+    btn.style.background = modoBuchuda ? 'var(--red)' : 'var(--surface-2)';
+    btn.style.borderColor = modoBuchuda ? '#8b2d3b' : 'var(--border)';
+    btn.style.color = modoBuchuda ? '#fff' : 'var(--text-muted)';
+  }
+  banner.style.display = modoBuchuda ? 'block' : 'none';
+}
+
 /* ---------- HISTORY ---------- */
 let historyFilter = 'all';
+
+function updateHistoryTabs(){
+  const filterBar = document.getElementById('historyFilterBar');
+  if(!filterBar) return;
+  const allTab = filterBar.querySelector('[data-filter="all"]');
+  if(allTab){
+    allTab.style.display = modoBuchuda ? 'none' : '';
+    if(modoBuchuda && historyFilter === 'all') setHistoryFilter('buchuda');
+    if(!modoBuchuda && historyFilter !== 'all') setHistoryFilter('all');
+  }
+}
 
 function setHistoryFilter(filter){
   historyFilter = filter;
@@ -779,12 +818,18 @@ function renderHistory(skipReRender){
   if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
   let matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
-  if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
+  if(modoBuchuda){
+    matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
+  } else {
+    if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
+    if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
+  }
   if(matches.length===0){
-    const msg = historyFilter !== 'all'
-      ? `Nenhuma partida com ${historyFilter === 'buchuda' ? 'buchuda' : 'buchuda de r\u00e9'} no hist\u00f3rico.`
-      : 'Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.';
+    const msg = modoBuchuda
+      ? 'Nenhuma partida com buchuda ou buchuda de r\u00e9 no hist\u00f3rico.'
+      : historyFilter !== 'all'
+        ? `Nenhuma partida com ${historyFilter === 'buchuda' ? 'buchuda' : 'buchuda de r\u00e9'} no hist\u00f3rico.`
+        : 'Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.';
     list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>${msg}</p></div>`;
     return;
   }
@@ -897,10 +942,24 @@ function renderRanking(){
     navEl.style.display = 'none';
   }
 
+  if(modoBuchuda) matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
+
   const list = document.getElementById('rankingList');
   if(matches.length===0){
-    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>Nenhuma partida registrada neste per\u00edodo.</p></div>`;
+    const msg = modoBuchuda ? 'Nenhuma partida com buchuda neste per\u00edodo.' : 'Nenhuma partida registrada neste per\u00edodo.';
+    list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>${msg}</p></div>`;
     return;
+  }
+
+  function renderRankRow(r, i, avatarLeft, nameHtml, statsHtml){
+    return `<div class="rank-row">
+      <div class="pos">${i+1}</div>
+      ${avatarLeft}
+      <div class="rinfo">
+        <div class="name">${nameHtml}</div>
+        <div class="sub">${statsHtml}</div>
+      </div>
+    </div>`;
   }
 
   if(rankingMode==='individual'){
@@ -921,22 +980,30 @@ function renderRanking(){
         idsA.forEach(id=>{ const s=ensureInd(id); s.derrotas++; if(m.buchuda) s.buchudasSofridas++; });
       }
     });
+    const sortFn = modoBuchuda
+      ? (a,b) => b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe || a.buchudasSofridas - b.buchudasSofridas
+      : (a,b) => b.vitorias - a.vitorias || (a.saldo||0) - (b.saldo||0) || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe;
     const rows = Object.values(indStats).map(s=>({...s, saldo:s.pontosPro-s.pontosContra}))
-      .sort((a,b)=> b.vitorias - a.vitorias || b.saldo - a.saldo || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe);
+      .sort(sortFn);
     list.innerHTML = rows.map((r,i)=>{
       const p = playerById(r.id);
       const name = p ? p.name : 'Jogador removido';
-      const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
       const extras = [];
       if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''}`);
       if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} de r\u00e9`);
       if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
+      if(modoBuchuda){
+        const statsHtml = extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''));
+        return renderRankRow(r, i, avatarHTML(p, 30), escapeHtml(name), statsHtml);
+      }
+      const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
+      const statsHtml = `${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}`;
       return `<div class="rank-row">
         <div class="pos">${i+1}</div>
         ${avatarHTML(p, 30)}
         <div class="rinfo">
           <div class="name">${escapeHtml(name)}</div>
-          <div class="sub">${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}</div>
+          <div class="sub">${statsHtml}</div>
         </div>
         <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
       </div>`;
@@ -966,22 +1033,32 @@ function renderRanking(){
     }
   });
 
+  const sortFn = modoBuchuda
+    ? (a,b) => b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe || a.buchudasSofridas - b.buchudasSofridas
+    : (a,b) => b.vitorias - a.vitorias || (a.saldo||0) - (b.saldo||0) || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe;
   const rows = Object.keys(stats).map(key=>{
     const s = stats[key];
     s.saldo = s.pontosPro - s.pontosContra;
     return {key, ...s};
-  }).sort((a,b)=> b.vitorias - a.vitorias || b.saldo - a.saldo || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe);
+  }).sort(sortFn);
 
   list.innerHTML = rows.map((r,i)=>{
     const p1 = playerById(r.ids[0]);
     const p2 = playerById(r.ids[1]);
     const name1 = p1 ? p1.name : 'Jogador removido';
     const name2 = p2 ? p2.name : 'Jogador removido';
-    const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
     const extras = [];
     if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
     if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
     if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
+    if(modoBuchuda){
+      const statsHtml = extras.join(' \u00b7 ');
+      const avatarLeft = `<div style="display:flex;align-items:center;gap:6px;">${avatarHTML(p1, 30)}<span style="font-size:11px;color:var(--text-muted);">&amp;</span>${avatarHTML(p2, 30)}</div>`;
+      const nameHtml = `${escapeHtml(name1)} &amp; ${escapeHtml(name2)}`;
+      return renderRankRow(r, i, avatarLeft, nameHtml, statsHtml);
+    }
+    const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
+    const statsHtml = extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''));
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -989,7 +1066,7 @@ function renderRanking(){
       </div>
       <div class="rinfo">
         <div class="name" style="font-size:13px;">${escapeHtml(name1)} &amp; ${escapeHtml(name2)}</div>
-        <div class="sub">${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}</div>
+        <div class="sub">${statsHtml}</div>
       </div>
       <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
     </div>`;
@@ -999,7 +1076,9 @@ function renderRanking(){
 /* ---------- INIT ---------- */
 (async function init(){
   await loadData();
+  modoBuchuda = localStorage.getItem('modo_buchuda') === '1';
   await checkSession();
+  updateBuchudaUI();
   if (isSyncNeeded()) retrySync();
   renderHome();
   window.addEventListener('online', retrySync);
