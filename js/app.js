@@ -795,19 +795,6 @@ function renderHistory(skipReRender){
     const dateHtml = user && user.role === 'admin'
       ? `<input type="date" class="date-edit" value="${dateStr}" data-match-id="${m.id}" onchange="updateMatchDate(this)" max="${new Date().toISOString().slice(0,10)}">`
       : `<span>${fmtDate(m.date)}</span>`;
-    const loser = m.winner === 'A' ? 'B' : 'A';
-    const isFiltered = historyFilter !== 'all';
-    let loserTag = '';
-    if(isFiltered){
-      if(historyFilter === 'buchuda' && m.buchuda)
-        loserTag = ' <span class="badge buchuda" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda</span>';
-      else if(historyFilter === 're' && m.buchudaDeRe)
-        loserTag = ' <span class="badge re" style="font-size:10px;padding:2px 7px;">\u{0001f0e2} Buchuda de r\u00e9</span>';
-    }
-    const badges = !isFiltered && (m.buchuda || m.buchudaDeRe) ? `<div class="badges">
-      ${m.buchuda?'<span class="badge buchuda">\u{0001f0e2} Buchuda</span>':''}
-      ${m.buchudaDeRe?'<span class="badge re">\u{0001f0e2} Buchuda de r\u00e9</span>':''}
-    </div>` : '';
     return `<div class="hist-card">
       <div class="date-row">
         <span>${dateHtml}</span>
@@ -816,11 +803,14 @@ function renderHistory(skipReRender){
         </span>
       </div>
       <div class="match-row">
-        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\u{0001f451} ':''}${teamAName}${loser==='A'?loserTag:''}</div>
+        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\u{0001f451} ':''}${teamAName}</div>
         <div class="mid-score">${m.scoreA} x ${m.scoreB}</div>
-        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${loser==='B'?loserTag:''}${m.winner==='B'?' \u{0001f451}':''}</div>
+        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' \u{0001f451}':''}</div>
       </div>
-      ${badges}
+      ${(m.buchuda || m.buchudaDeRe) ? `<div class="badges">
+        ${m.buchuda?'<span class="badge buchuda">\u{0001f0e2} Buchuda</span>':''}
+        ${m.buchudaDeRe?'<span class="badge re">\u{0001f0e2} Buchuda de r\u00e9</span>':''}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
