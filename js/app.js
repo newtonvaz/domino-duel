@@ -29,6 +29,21 @@ function saveLocal(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
 }
 
+const SYNC_FLAG_KEY = 'duelo_sync_needed';
+function markSyncNeeded() { localStorage.setItem(SYNC_FLAG_KEY, '1'); updateSyncUI(); }
+function clearSyncNeeded() { localStorage.removeItem(SYNC_FLAG_KEY); updateSyncUI(); }
+function isSyncNeeded() { return localStorage.getItem(SYNC_FLAG_KEY) === '1'; }
+function updateSyncUI() {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  if (isSyncNeeded()) {
+    el.textContent = ' ⏳ Pendente';
+    el.style.display = 'inline';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 async function loadData(){
   const [playersRemote, matchesRemote] = await Promise.all([
     api('listPlayers'), api('listMatches')
@@ -54,14 +69,29 @@ async function loadData(){
 
 async function saveData(){
   saveLocal();
-  api('savePlayers', {players: data.players.filter(p => p.id)});
-  api('saveMatches', {matches: data.matches.filter(m => m.id)});
+  const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
+  const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
+  if (playersRes && playersRes.ok && matchesRes && matchesRes.ok) {
+    api('saveBackup', {players: data.players, matches: data.matches});
+    clearSyncNeeded();
+  } else {
+    markSyncNeeded();
+  }
+}
+
+async function retrySync(){
+  if (!isSyncNeeded()) return;
+  const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
+  const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
+  if (playersRes && playersRes.ok && matchesRes && matchesRes.ok) {
+    api('saveBackup', {players: data.players, matches: data.matches});
+    clearSyncNeeded();
+  }
 }
 
 async function deleteMatchServer(id){
   data.matches = data.matches.filter(m => m.id !== id);
-  saveLocal();
-  api('saveMatches', {matches: data.matches});
+  await saveData();
   renderHistory();
 }
 
@@ -69,8 +99,7 @@ async function deletePlayerServer(id){
   if(!user || user.role !== 'admin') return;
   if(!confirm('Remover este jogador? O hist\u00f3rico de partidas ser\u00e1 mantido.')) return;
   data.players = data.players.filter(p=>p.id!==id);
-  saveLocal();
-  api('savePlayers', {players: data.players});
+  await saveData();
   renderPlayers();
 }
 
@@ -112,8 +141,9 @@ function pipsHTML(n, small){
   return `<div class="pip-grid${small?' small':''}">${cells}</div>`;
 }
 function fmtDate(iso){
-  const opt = {timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone, day:'2-digit',month:'2-digit',year:'2-digit', hour:'2-digit',minute:'2-digit'};
-  return new Date(iso).toLocaleString('pt-BR', opt);
+  if(!iso) return '--';
+  const d = new Date(iso + (iso.length <= 10 ? 'T12:00:00' : ''));
+  return d.toLocaleDateString('pt-BR');
 }
 function fmtDuration(sec){
   if(!sec && sec !== 0) return '--';
@@ -306,30 +336,44 @@ function logout(){
   location.reload();
 }
 
+async function refreshFromServer(){
+  const [playersRemote, matchesRemote] = await Promise.all([
+    api('listPlayers'), api('listMatches')
+  ]);
+  if(playersRemote && Array.isArray(playersRemote)){
+    data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
+  }
+  if(matchesRemote && Array.isArray(matchesRemote)){
+    data.matches = matchesRemote.map(m => ({
+      id: m.id, date: m.date,
+      teamA: m.team_a || m.teamA,
+      teamB: m.team_b || m.teamB,
+      scoreA: m.score_a ?? m.scoreA,
+      scoreB: m.score_b ?? m.scoreB,
+      winner: m.winner,
+      buchuda: m.buchuda,
+      buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
+      durationSec: m.duration_sec ?? m.durationSec
+    }));
+  }
+  const activeView = document.querySelector('.view.active');
+  if(activeView){
+    switch(activeView.id.replace('view-','')){
+      case 'home': renderHome(); break;
+      case 'players': renderPlayers(); break;
+      case 'history': renderHistory(); break;
+      case 'ranking': renderRanking(); break;
+    }
+  }
+}
+
 function startPolling(){
   stopPolling();
   pollTimer = setInterval(async () => {
-    const playersRemote = await api('listPlayers');
-    const matchesRemote = await api('listMatches');
-    if(playersRemote && Array.isArray(playersRemote)){
-      data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
-    }
-    if(matchesRemote && Array.isArray(matchesRemote)){
-      data.matches = matchesRemote.map(m => ({
-        id: m.id, date: m.date,
-        teamA: m.team_a || m.teamA,
-        teamB: m.team_b || m.teamB,
-        scoreA: m.score_a ?? m.scoreA,
-        scoreB: m.score_b ?? m.scoreB,
-        winner: m.winner,
-        buchuda: m.buchuda,
-        buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
-        durationSec: m.duration_sec ?? m.durationSec
-      }));
-    }
-    document.querySelector('.view.active')?.id === 'view-home' && renderHome();
+    await refreshFromServer();
     renderPendingUsers();
-  }, 10000);
+    if (isSyncNeeded()) retrySync();
+  }, 3000);
 }
 
 function stopPolling(){
@@ -457,7 +501,7 @@ document.getElementById('photoInput').addEventListener('change', (e)=>{
   reader.readAsDataURL(file);
 });
 
-function savePlayer(){
+async function savePlayer(){
   if(!user) return;
   const name = document.getElementById('playerName').value.trim();
   if(!name){ document.getElementById('playerFormError').textContent = 'Informe o nome do jogador.'; return; }
@@ -465,13 +509,15 @@ function savePlayer(){
     document.getElementById('playerFormError').textContent = 'Este jogador j\u00e1 existe.';
     return;
   }
+  const btn = document.querySelector('#playerModalOverlay .btn-primary');
+  btn.disabled = true; btn.textContent = 'Salvando...';
   if(editingPlayerId){
     const p = playerById(editingPlayerId);
     p.name = name; p.photo = pendingPhoto;
   } else {
     data.players.push({id:uid('pl'), name, photo: pendingPhoto});
   }
-  saveData();
+  await saveData();
   closePlayerModal();
   renderPlayers();
 }
@@ -494,6 +540,13 @@ function renderMatchSetup(){
       <button class="btn btn-secondary" style="width:auto;padding:12px 20px;display:inline-flex;" onclick="showView('players')">Ver Jogadores</button>
     </div>`;
     return;
+  }
+
+  const today = new Date().toISOString().slice(0,10);
+  const dateInput = document.getElementById('matchDate');
+  if(dateInput){
+    dateInput.max = today;
+    if(!dateInput.value) dateInput.value = today;
   }
 
   const selects = ['selA1','selA2','selB1','selB2'];
@@ -522,13 +575,15 @@ function startMatch(){
     return;
   }
   err.textContent = '';
+  const dateInput = document.getElementById('matchDate');
   matchState = {
     teamA:[a1,a2], teamB:[b1,b2],
     scoreA:0, scoreB:0,
     history:[[0,0]],
     startTime: Date.now(),
     finished:false,
-    result:null
+    result:null,
+    selectedDate: dateInput ? dateInput.value || new Date().toISOString().slice(0,10) : new Date().toISOString().slice(0,10)
   };
   renderMatchSetup();
 }
@@ -689,12 +744,14 @@ function toggleResultFlag(flag){
   matchState['_'+flag] = !matchState['_'+flag];
   renderLiveMatch();
 }
-function saveMatch(){
+async function saveMatch(){
   if(!user) return;
   const r = matchState.result;
+  const btn = document.querySelector('#liveMatchWrap .btn-primary');
+  btn.disabled = true; btn.textContent = 'Salvando...';
   data.matches.push({
     id: uid('m'),
-    date: new Date().toISOString(),
+    date: matchState.selectedDate || new Date().toISOString().slice(0,10),
     teamA: matchState.teamA,
     teamB: matchState.teamB,
     scoreA: matchState.scoreA,
@@ -704,13 +761,14 @@ function saveMatch(){
     buchudaDeRe: !!matchState._buchudaDeRe,
     durationSec: Math.round((Date.now()-matchState.startTime)/1000)
   });
-  saveData();
+  await saveData();
   matchState = null;
   showView('history');
 }
 
 /* ---------- HISTORY ---------- */
-function renderHistory(){
+function renderHistory(skipReRender){
+  if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
   const matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(matches.length===0){
@@ -720,9 +778,13 @@ function renderHistory(){
   list.innerHTML = matches.map(m=>{
     const teamAName = `${playerName(m.teamA[0])} &amp; ${playerName(m.teamA[1])}`;
     const teamBName = `${playerName(m.teamB[0])} &amp; ${playerName(m.teamB[1])}`;
+    const dateStr = m.date ? m.date.slice(0,10) : '';
+    const dateHtml = user && user.role === 'admin'
+      ? `<input type="date" class="date-edit" value="${dateStr}" data-match-id="${m.id}" onchange="updateMatchDate(this)" max="${new Date().toISOString().slice(0,10)}">`
+      : `<span>${fmtDate(m.date)}</span>`;
     return `<div class="hist-card">
       <div class="date-row">
-        <span>${fmtDate(m.date)}</span>
+        <span>${dateHtml}</span>
         <span style="display:flex;align-items:center;gap:8px;">
           <button class="icon-btn admin-only" onclick="deleteMatch('${m.id}')" title="Remover duelo" style="width:28px;height:28px;font-size:12px;">\u{0001f5d1}</button>
         </span>
@@ -740,7 +802,18 @@ function renderHistory(){
   }).join('');
 }
 
-function deleteMatch(id){
+async function updateMatchDate(input){
+  const id = input.dataset.matchId;
+  const match = data.matches.find(m => m.id === id);
+  if(!match || !input.value) return;
+  const today = new Date().toISOString().slice(0,10);
+  if(input.value > today) return;
+  match.date = input.value;
+  await saveData();
+  renderHistory(true);
+}
+
+async function deleteMatch(id){
   if(!user || user.role !== 'admin'){ alert('Apenas admin pode remover duelos.'); return; }
   const match = data.matches.find(m=>m.id===id);
   if(!match) return;
@@ -748,8 +821,7 @@ function deleteMatch(id){
   const teamBName = `${playerName(match.teamB[0])} &amp; ${playerName(match.teamB[1])}`;
   if(!confirm(`Remover este duelo?\n${teamAName} ${match.scoreA}x${match.scoreB} ${teamBName}`)) return;
   data.matches = data.matches.filter(m=>m.id!==id);
-  saveLocal();
-  api('saveMatches', {matches: data.matches});
+  await saveData();
   renderHistory();
 }
 
@@ -915,5 +987,13 @@ function renderRanking(){
 (async function init(){
   await loadData();
   await checkSession();
+  if (isSyncNeeded()) retrySync();
   renderHome();
+  window.addEventListener('online', retrySync);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && user) refreshFromServer();
+  });
+  window.addEventListener('focus', () => {
+    if (user) refreshFromServer();
+  });
 })();

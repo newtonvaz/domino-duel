@@ -231,7 +231,9 @@ body.is-admin .nav-btn.admin-only{display:flex;}
 .badge.toggle-off{background:var(--surface-2);color:var(--text-muted);border:1px solid var(--border);opacity:.6;}
 
 .hist-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;}
-.hist-card .date-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:8px;}
+.hist-card .date-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted);margin-bottom:8px;}
+.date-edit{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 6px;color:var(--text);font-family:var(--font-body);font-size:11px;width:130px;}
+.date-edit:focus{outline:none;border-color:var(--gold-deep);}
 .hist-card .match-row{display:flex;align-items:center;justify-content:space-between;}
 .hist-card .side{flex:1;font-size:13.5px;font-weight:600;}
 .hist-card .side.winner{color:var(--gold-soft);}

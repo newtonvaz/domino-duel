@@ -24,6 +24,7 @@
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <span class="admin-only" id="adminBadge" style="font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.5px;">Admin</span>
+      <span id="syncStatus" style="font-size:11px;color:var(--orange);font-weight:600;display:none;">⏳ Pendente</span>
       <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Login</span></button>
     </div>
   </header>
@@ -84,6 +85,10 @@
           <div class="field" style="margin-bottom:0;"><select id="selB2"></select></div>
         </div>
 
+        <div class="field">
+          <label>Data da partida</label>
+          <input type="date" id="matchDate">
+        </div>
         <div class="error-text" id="matchSetupError"></div>
         <button class="btn btn-primary" onclick="startMatch()">Iniciar Duelo ▶</button>
       </div>

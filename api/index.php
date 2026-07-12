@@ -164,6 +164,34 @@ switch ($action) {
         echo json_encode(['ok' => true]);
         break;
 
+    /* ---------- BACKUP ---------- */
+    case 'saveBackup':
+        $input = jsonInput();
+        $backupDir = __DIR__ . '/../data';
+        if (!is_dir($backupDir)) {
+            mkdir($backupDir, 0755, true);
+        }
+        $backup = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'players' => $input['players'] ?? [],
+            'matches' => $input['matches'] ?? []
+        ];
+        file_put_contents(
+            $backupDir . '/backup.json',
+            json_encode($backup, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        );
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'listBackup':
+        $backupFile = __DIR__ . '/../data/backup.json';
+        if (file_exists($backupFile)) {
+            echo file_get_contents($backupFile);
+        } else {
+            echo json_encode(['timestamp' => null, 'players' => [], 'matches' => []]);
+        }
+        break;
+
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Unknown action']);
