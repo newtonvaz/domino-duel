@@ -1,0 +1,6 @@
+AddType application/manifest+json json
+AddType image/png png
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 1 year"
+</IfModule>

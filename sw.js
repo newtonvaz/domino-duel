@@ -1,11 +1,17 @@
-const CACHE = 'domino-v5';
+const CACHE = 'domino-v6';
 
 const STATIC = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/app.js',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/favicon.png',
 ];
+
+const MANIFEST_CACHE = 'domino-manifest-v1';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -17,7 +23,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     Promise.all([
-      caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))),
+      caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== MANIFEST_CACHE).map(k => caches.delete(k)))),
       self.clients.claim()
     ])
   );
@@ -29,12 +35,27 @@ self.addEventListener('message', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname === '/manifest.json' || url.pathname.startsWith('/icons/')) {
+    e.respondWith(cacheFirst(e.request));
+  } else if (url.pathname.startsWith('/api/')) {
     e.respondWith(networkFirst(e.request));
   } else {
     e.respondWith(networkFirst(e.request));
   }
 });
+
+async function cacheFirst(req) {
+  const cached = await caches.match(req);
+  if (cached) return cached;
+  try {
+    const res = await fetch(req);
+    const cache = await caches.open(CACHE);
+    cache.put(req, res.clone());
+    return res;
+  } catch {
+    return new Response(JSON.stringify({error: 'offline'}), {status: 503});
+  }
+}
 
 async function networkFirst(req) {
   try {
