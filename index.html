@@ -7,7 +7,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>DOMINÓ DO TORRES — Placar & Ranking</title>
-<link rel="manifest" href="manifest.json?v=2">
+<link rel="manifest" href="manifest.json?v=3">
+<meta name="theme-color" content="#0a0c11">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dominó Torres">
@@ -28,9 +29,9 @@
       <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span class="admin-only" id="adminBadge" style="font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.5px;">Admin</span>
+      <span id="buchudaBall" style="width:10px;height:10px;border-radius:50%;background:var(--text-muted);cursor:pointer;flex-shrink:0;" onclick="toggleModoBuchuda()" title="Modo Buchuda"></span>
+      <span class="admin-only flex" id="adminBadge" style="align-items:center;gap:5px;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.5px;">Admin</span>
       <span id="syncStatus" style="font-size:11px;color:var(--orange);font-weight:600;display:none;">⏳ Pendente</span>
-      <button class="admin-only" id="buchudaToggleBtn" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);font-size:11px;font-weight:700;padding:6px 10px;border-radius:16px;cursor:pointer;display:none;" onclick="toggleModoBuchuda()">BUCHUDA</button>
       <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Login</span></button>
     </div>
   </header>

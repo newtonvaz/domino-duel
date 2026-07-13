@@ -164,6 +164,29 @@ switch ($action) {
         echo json_encode(['ok' => true]);
         break;
 
+    /* ---------- SETTINGS ---------- */
+    case 'saveSettings':
+        $input = jsonInput();
+        $backupDir = __DIR__ . '/../data';
+        if (!is_dir($backupDir)) {
+            mkdir($backupDir, 0755, true);
+        }
+        file_put_contents(
+            $backupDir . '/settings.json',
+            json_encode($input, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        );
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'listSettings':
+        $file = __DIR__ . '/../data/settings.json';
+        if (file_exists($file)) {
+            echo file_get_contents($file);
+        } else {
+            echo json_encode((object)[]);
+        }
+        break;
+
     /* ---------- BACKUP ---------- */
     case 'saveBackup':
         $input = jsonInput();

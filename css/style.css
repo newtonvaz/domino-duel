@@ -270,7 +270,7 @@ nav.bottom-nav{
 .nav-btn.active{color:var(--gold-soft);background:var(--surface-2);}
 
 #buchudaBanner{background:#8b1a2b;color:#fff;text-align:center;font-weight:700;font-size:12px;padding:7px 14px;letter-spacing:.5px;}
-#buchudaToggleBtn{font-family:var(--font-body);font-size:10px;font-weight:800;padding:5px 10px;border-radius:16px;cursor:pointer;letter-spacing:.5px;transition:.15s;}
+
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}

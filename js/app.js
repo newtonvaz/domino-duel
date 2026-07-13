@@ -44,29 +44,6 @@ function updateSyncUI() {
   }
 }
 
-async function loadData(){
-  const [playersRemote, matchesRemote] = await Promise.all([
-    api('listPlayers'), api('listMatches')
-  ]);
-  if(playersRemote && Array.isArray(playersRemote) && matchesRemote && Array.isArray(matchesRemote)){
-    data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
-    data.matches = matchesRemote.map(m => ({
-      id: m.id, date: m.date,
-      teamA: m.team_a || m.teamA,
-      teamB: m.team_b || m.teamB,
-      scoreA: m.score_a ?? m.scoreA,
-      scoreB: m.score_b ?? m.scoreB,
-      winner: m.winner,
-      buchuda: m.buchuda,
-      buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
-      durationSec: m.duration_sec ?? m.durationSec
-    }));
-    saveLocal();
-  } else {
-    loadLocal();
-  }
-}
-
 async function saveData(){
   saveLocal();
   const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
@@ -191,7 +168,6 @@ function checkSession(){
   if(raw) user = JSON.parse(raw);
   else user = null;
   updateAuthUI();
-  if(user) startPolling();
 }
 
 function updateAuthUI(){
@@ -337,8 +313,8 @@ function logout(){
 }
 
 async function refreshFromServer(){
-  const [playersRemote, matchesRemote] = await Promise.all([
-    api('listPlayers'), api('listMatches')
+  const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
+    api('listPlayers'), api('listMatches'), api('listSettings')
   ]);
   if(playersRemote && Array.isArray(playersRemote)){
     data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
@@ -355,6 +331,10 @@ async function refreshFromServer(){
       buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
       durationSec: m.duration_sec ?? m.durationSec
     }));
+  }
+  if(settingsRemote && settingsRemote.modo_buchuda !== undefined){
+    modoBuchuda = settingsRemote.modo_buchuda;
+    updateBuchudaUI();
   }
   const activeView = document.querySelector('.view.active');
   if(activeView){
@@ -773,6 +753,7 @@ function toggleModoBuchuda(){
   modoBuchuda = !modoBuchuda;
   localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
   updateBuchudaUI();
+  api('saveSettings', {modo_buchuda: modoBuchuda});
   const activeView = document.querySelector('.view.active');
   if(activeView){
     const id = activeView.id.replace('view-','');
@@ -782,15 +763,11 @@ function toggleModoBuchuda(){
 }
 
 function updateBuchudaUI(){
-  const btn = document.getElementById('buchudaToggleBtn');
+  const ball = document.getElementById('buchudaBall');
   const banner = document.getElementById('buchudaBanner');
-  if(!btn || !banner) return;
-  if(user && user.role === 'admin'){
-    btn.style.display = '';
-    btn.style.background = modoBuchuda ? 'var(--red)' : 'var(--surface-2)';
-    btn.style.borderColor = modoBuchuda ? '#8b2d3b' : 'var(--border)';
-    btn.style.color = modoBuchuda ? '#fff' : 'var(--text-muted)';
-  }
+  if(!ball || !banner) return;
+  ball.style.background = modoBuchuda ? '#d1495b' : 'var(--text-muted)';
+  ball.style.display = '';
   banner.style.display = modoBuchuda ? 'block' : 'none';
 }
 
@@ -818,18 +795,12 @@ function renderHistory(skipReRender){
   if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
   let matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  if(modoBuchuda){
-    matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
-  } else {
-    if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
-    if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
-  }
+  if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
+  if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
   if(matches.length===0){
-    const msg = modoBuchuda
-      ? 'Nenhuma partida com buchuda ou buchuda de r\u00e9 no hist\u00f3rico.'
-      : historyFilter !== 'all'
-        ? `Nenhuma partida com ${historyFilter === 'buchuda' ? 'buchuda' : 'buchuda de r\u00e9'} no hist\u00f3rico.`
-        : 'Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.';
+    const msg = historyFilter !== 'all'
+      ? `Nenhuma partida com ${historyFilter === 'buchuda' ? 'buchuda' : 'buchuda de r\u00e9'} no hist\u00f3rico.`
+      : 'Nenhuma partida no hist\u00f3rico ainda. Jogue um duelo para come\u00e7ar a registrar.';
     list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f4dc}</div><p>${msg}</p></div>`;
     return;
   }
@@ -1075,17 +1046,49 @@ function renderRanking(){
 
 /* ---------- INIT ---------- */
 (async function init(){
-  await loadData();
+  loadLocal();
   modoBuchuda = localStorage.getItem('modo_buchuda') === '1';
   await checkSession();
   updateBuchudaUI();
-  if (isSyncNeeded()) retrySync();
   renderHome();
+  startPolling();
+  await syncFromServer();
+  updateBuchudaUI();
+  renderHome();
+  if (isSyncNeeded()) retrySync();
   window.addEventListener('online', retrySync);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && user) refreshFromServer();
+    if (!document.hidden) refreshFromServer();
   });
   window.addEventListener('focus', () => {
-    if (user) refreshFromServer();
+    refreshFromServer();
   });
 })();
+
+async function syncFromServer(){
+  const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
+    api('listPlayers'), api('listMatches'), api('listSettings')
+  ]);
+  if(playersRemote && Array.isArray(playersRemote) && matchesRemote && Array.isArray(matchesRemote)){
+    data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
+    data.matches = matchesRemote.map(m => ({
+      id: m.id, date: m.date,
+      teamA: m.team_a || m.teamA,
+      teamB: m.team_b || m.teamB,
+      scoreA: m.score_a ?? m.scoreA,
+      scoreB: m.score_b ?? m.scoreB,
+      winner: m.winner,
+      buchuda: m.buchuda,
+      buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
+      durationSec: m.duration_sec ?? m.durationSec
+    }));
+    saveLocal();
+  }
+  const localMb = localStorage.getItem('modo_buchuda');
+  if(settingsRemote && settingsRemote.modo_buchuda !== undefined) {
+    modoBuchuda = settingsRemote.modo_buchuda;
+    localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
+  } else if(localMb !== null) {
+    modoBuchuda = localMb === '1';
+  }
+}
