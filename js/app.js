@@ -1064,25 +1064,12 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
-  checkAppUpdate();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
-      setInterval(() => { reg.update(); checkAppUpdate(); }, 3000);
+      setInterval(() => reg.update(), 3000);
     });
-  } else {
-    setInterval(checkAppUpdate, 3000);
   }
 })();
-
-function checkAppUpdate(){
-  const baseUrl = 'js/app.js';
-  fetch(baseUrl + '?_=' + Date.now(), {method: 'HEAD', cache: 'no-store'}).then(r => {
-    const etag = r.headers.get('etag') || r.headers.get('last-modified') || r.headers.get('content-length') || '';
-    const last = localStorage.getItem('app_js_etag');
-    if(last && last !== etag && etag) location.reload();
-    if(etag) localStorage.setItem('app_js_etag', etag);
-  }).catch(() => {});
-}
 
 async function syncFromServer(){
   const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
