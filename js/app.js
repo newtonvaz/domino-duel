@@ -1066,7 +1066,7 @@ function renderRanking(){
   });
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
-      setInterval(() => reg.update(), 30000);
+      setInterval(() => reg.update(), 3000);
     });
   }
 })();
