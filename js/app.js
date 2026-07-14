@@ -334,6 +334,7 @@ async function refreshFromServer(){
   }
   if(settingsRemote && settingsRemote.modo_buchuda !== undefined){
     modoBuchuda = settingsRemote.modo_buchuda;
+    localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
     updateBuchudaUI();
   }
   const activeView = document.querySelector('.view.active');
