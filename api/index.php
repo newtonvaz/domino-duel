@@ -164,6 +164,16 @@ switch ($action) {
         echo json_encode(['ok' => true]);
         break;
 
+    /* ---------- APP VERSION ---------- */
+    case 'checkAppJs':
+        $jsFile = __DIR__ . '/../js/app.js';
+        if (file_exists($jsFile)) {
+            echo json_encode(['size' => filesize($jsFile), 'mtime' => filemtime($jsFile)]);
+        } else {
+            echo json_encode(['size' => 0, 'mtime' => 0]);
+        }
+        break;
+
     /* ---------- SETTINGS ---------- */
     case 'saveSettings':
         $input = jsonInput();
