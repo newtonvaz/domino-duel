@@ -354,7 +354,7 @@ function startPolling(){
     await refreshFromServer();
     renderPendingUsers();
     if (isSyncNeeded()) retrySync();
-  }, 3000);
+  }, 1000);
 }
 
 function stopPolling(){
