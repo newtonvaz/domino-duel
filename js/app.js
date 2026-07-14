@@ -1069,7 +1069,22 @@ function renderRanking(){
       setInterval(() => reg.update(), 3000);
     });
   }
+  checkAppUpdate();
+  setInterval(checkAppUpdate, 3000);
 })();
+
+async function checkAppUpdate(){
+  try {
+    const r = await fetch('js/app.js?_=' + Date.now(), {cache: 'no-store'});
+    const text = await r.text();
+    if(text.includes('<html') || text.includes('<script')) return;
+    const key = 'app_js_len';
+    const last = localStorage.getItem(key);
+    const cur = String(text.length);
+    if(last && last !== cur) location.reload();
+    localStorage.setItem(key, cur);
+  } catch(e) {}
+}
 
 async function syncFromServer(){
   const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
