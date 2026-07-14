@@ -1064,6 +1064,11 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.ready.then(reg => {
+      setInterval(() => reg.update(), 30000);
+    });
+  }
 })();
 
 async function syncFromServer(){
