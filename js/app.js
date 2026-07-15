@@ -571,7 +571,7 @@ function resolvePlayer(name){
 }
 
 function startMatch(){
-  if(!user) return;
+  if(!user){ document.getElementById('matchSetupError').textContent = 'Fa\u00e7a login para iniciar uma partida.'; return; }
   const raw = ['selA1','selA2','selB1','selB2'].map(id => document.getElementById(id).value);
   const err = document.getElementById('matchSetupError');
   if(raw.some(x=>!x.trim())){ err.textContent = 'Selecione os 4 jogadores.'; return; }
@@ -586,7 +586,7 @@ function startMatch(){
   err.textContent = '';
   const dateInput = document.getElementById('matchDate');
   matchState = {
-    teamA:[a1,a2], teamB:[b1,b2],
+    teamA:[ids[0],ids[1]], teamB:[ids[2],ids[3]],
     scoreA:0, scoreB:0,
     history:[[0,0]],
     startTime: Date.now(),
