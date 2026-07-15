@@ -660,34 +660,23 @@ function renderLiveMatch(){
   `;
 }
 
-function goFullscreen(){
-  const el = document.documentElement;
-  if(el.requestFullscreen) return el.requestFullscreen();
-  if(el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
-  return Promise.resolve();
-}
-
-function exitFullscreen(){
-  if(document.fullscreenElement || document.webkitFullscreenElement){
-    if(document.exitFullscreen) return document.exitFullscreen();
-    if(document.webkitExitFullscreen) return document.webkitExitFullscreen();
-  }
-  return Promise.resolve();
+function lockOrientation(o){
+  try { screen.orientation.lock(o); } catch(e) { try { screen.orientation.lock(o === 'landscape' ? 'landscape-secondary' : 'portrait'); } catch(e2) {} }
 }
 
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    goFullscreen();
+    lockOrientation('landscape');
   } else {
-    exitFullscreen();
+    lockOrientation('portrait');
   }
 }
 
 function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
-  exitFullscreen();
+  lockOrientation('portrait');
 }
 
 document.addEventListener('keydown', e => {
@@ -1133,6 +1122,7 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
+  try { screen.orientation.lock('portrait'); } catch(e) {}
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
       setInterval(() => reg.update(), 3000);
