@@ -628,6 +628,7 @@ function renderLiveMatch(){
 
   wrap.innerHTML = `
     <div class="live-board">
+      <button class="placar-close" onclick="exitPlacarMode()" title="Sair do Modo Placar">\u2715</button>
       <div class="live-team">
         <div class="who"><div class="label">Dupla A</div><div class="names">${teamAName}</div></div>
         <div class="score-editor">
@@ -668,8 +669,14 @@ function togglePlacarMode(){
   }
 }
 
+function exitPlacarMode(){
+  if(!document.body.classList.contains('placar-mode')) return;
+  document.body.classList.remove('placar-mode');
+  screen.orientation.unlock();
+}
+
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape' && document.body.classList.contains('placar-mode')) togglePlacarMode();
+  if(e.key === 'Escape' && document.body.classList.contains('placar-mode')) exitPlacarMode();
 });
 
 function adjustScore(team, delta){
@@ -734,11 +741,13 @@ function undoPoint(){
 }
 function cancelMatch(){
   if(!confirm('Cancelar esta partida sem salvar?')) return;
+  exitPlacarMode();
   matchState = null;
   renderMatchSetup();
 }
 function discardMatch(){
   if(!user) return;
+  exitPlacarMode();
   matchState = null;
   renderMatchSetup();
 }
@@ -787,6 +796,7 @@ async function saveMatch(){
     durationSec: Math.round((Date.now()-matchState.startTime)/1000)
   });
   await saveData();
+  exitPlacarMode();
   matchState = null;
   showView('history');
 }
