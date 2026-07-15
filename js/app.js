@@ -660,17 +660,33 @@ function renderLiveMatch(){
   `;
 }
 
+function goFullscreen(){
+  const el = document.documentElement;
+  if(el.requestFullscreen) return el.requestFullscreen();
+  if(el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+  return Promise.resolve();
+}
+
+function exitFullscreen(){
+  if(document.fullscreenElement || document.webkitFullscreenElement){
+    if(document.exitFullscreen) return document.exitFullscreen();
+    if(document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  }
+  return Promise.resolve();
+}
+
+function lockLandscape(){
+  const lock = (o) => screen.orientation.lock(o);
+  return lock('landscape-primary').catch(()=> lock('landscape')).catch(()=>{});
+}
+
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    try {
-      document.documentElement.requestFullscreen().then(()=>{
-        screen.orientation.lock('landscape').catch(()=>{});
-      }).catch(()=>{});
-    }catch(e){}
+    goFullscreen().then(()=> lockLandscape()).catch(()=> lockLandscape());
   } else {
     try { screen.orientation.unlock(); }catch(e){}
-    try { if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+    exitFullscreen();
   }
 }
 
@@ -678,7 +694,7 @@ function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
   try { screen.orientation.unlock(); }catch(e){}
-  try { if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  exitFullscreen();
 }
 
 document.addEventListener('keydown', e => {
