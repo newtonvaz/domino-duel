@@ -183,6 +183,11 @@ body.is-admin .nav-btn.admin-only{display:flex;}
 .modal-box h3{font-family:var(--font-display);font-size:20px;margin:0 0 14px;color:var(--ivory);}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:6px;font-weight:600;}
+.search-field{position:relative;}
+.player-dd{position:absolute;top:100%;left:0;right:0;background:var(--surface-2);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;display:none;z-index:20;}
+.player-dd.show{display:block;}
+.player-dd .dd-item{padding:9px 12px;font-size:13px;cursor:pointer;color:var(--text);}
+.player-dd .dd-item:hover,.player-dd .dd-item.highlight{background:var(--surface-3);color:var(--gold-soft);}
 .field input,.field select{
   width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
   padding:11px 12px;color:var(--text);font-family:var(--font-body);font-size:14px;

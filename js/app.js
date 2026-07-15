@@ -530,14 +530,39 @@ function renderMatchSetup(){
     if(!dateInput.value) dateInput.value = today;
   }
 
-  const dl = document.getElementById('playersDatalist');
-  if(dl) dl.innerHTML = data.players.map(p => `<option value="${escapeHtml(p.name)}">`).join('');
-
   const inputs = ['selA1','selA2','selB1','selB2'];
-  inputs.forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.setAttribute('list', 'playersDatalist');
+  inputs.forEach(id => initSearchInput(id));
+}
+
+function initSearchInput(id){
+  const input = document.getElementById(id);
+  if(!input) return;
+  const dd = input.parentElement.querySelector('.player-dd');
+  if(!dd) return;
+  const old = input._ddHandler;
+  if(old){ input.removeEventListener('focus', old.onFocus); input.removeEventListener('input', old.onInput); document.removeEventListener('click', old.onDocClick); }
+
+  function showDd(filter){
+    dd.innerHTML = data.players
+      .filter(p => !filter || p.name.toLowerCase().includes(filter.toLowerCase()))
+      .map(p => `<div class="dd-item" data-id="${p.id}">${escapeHtml(p.name)}</div>`)
+      .join('');
+    dd.classList.toggle('show', dd.children.length > 0);
+  }
+  function hideDd(){ dd.classList.remove('show'); }
+
+  const onFocus = () => showDd('');
+  const onInput = () => { const v = input.value.trim(); showDd(v); };
+  const onDocClick = e => { if(!input.parentElement.contains(e.target)) hideDd(); };
+
+  input.addEventListener('focus', onFocus);
+  input.addEventListener('input', onInput);
+  document.addEventListener('click', onDocClick);
+  dd.addEventListener('click', e => {
+    const item = e.target.closest('.dd-item');
+    if(item){ input.value = item.textContent; hideDd(); input.dispatchEvent(new Event('input')); }
   });
+  input._ddHandler = {onFocus, onInput, onDocClick};
 }
 
 function resolvePlayer(name){
