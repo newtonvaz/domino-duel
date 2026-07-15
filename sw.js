@@ -1,4 +1,4 @@
-const CACHE = 'domino-v16';
+const CACHE = 'domino-v17';
 
 const STATIC = [
   '/',

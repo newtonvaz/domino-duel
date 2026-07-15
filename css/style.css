@@ -285,12 +285,16 @@ body.placar-mode nav.bottom-nav{display:none !important;}
 body.placar-mode #liveMatchWrap .btn-row{display:none !important;}
 body.placar-mode .result-panel .btn-row{display:flex !important;}
 body.placar-mode main{padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;}
-body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;}
-body.placar-mode .score-num{font-size:56px;}
-body.placar-mode .score-adj{width:52px;height:52px;font-size:28px;}
+body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;display:flex;flex-direction:row;align-items:center;justify-content:space-evenly;gap:10px;padding:20px;}
+body.placar-mode .live-board .live-team{flex-direction:column;align-items:center;text-align:center;margin:0;flex:1;}
+body.placar-mode .live-board .live-team .who{max-width:none;margin-bottom:10px;}
+body.placar-mode .live-board .vs-divider{writing-mode:lr;margin:0;font-size:18px;}
 body.placar-mode .pip-grid.small{display:none;}
-body.placar-mode .live-team .names{font-size:20px;}
-body.placar-mode .vs-divider{font-size:16px;margin:10px 0 20px;}
+body.placar-mode .score-num{font-size:72px;min-width:80px;}
+body.placar-mode .score-adj{width:56px;height:56px;font-size:30px;border-radius:14px;}
+body.placar-mode .live-team .names{font-size:18px;}
+body.placar-mode .live-board .score-editor{flex-direction:column;align-items:center;gap:8px;}
+body.placar-mode .live-board .score-editor .pip-grid{display:none;}
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
