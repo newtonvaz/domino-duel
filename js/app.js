@@ -1112,7 +1112,15 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
-  try { screen.orientation.lock('portrait'); } catch(e) {}
+  (function lockPortrait(){
+    if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{});
+    if(screen.orientation) screen.orientation.addEventListener('change', ()=>{
+      if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{});
+    });
+    const mql = window.matchMedia('(orientation:landscape)');
+    if(mql.addEventListener) mql.addEventListener('change', e=>{ if(e.matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{}); });
+    setInterval(()=>{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{}); }, 2000);
+  })();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
       setInterval(() => reg.update(), 3000);
