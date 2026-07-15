@@ -663,9 +663,11 @@ function renderLiveMatch(){
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    screen.orientation.lock('landscape-secondary').catch(() => {});
+    if(screen.orientation && screen.orientation.lock){
+      screen.orientation.lock('landscape-secondary').catch(() => screen.orientation.lock('landscape').catch(() => {}));
+    }
   } else {
-    screen.orientation.unlock();
+    if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
   }
 }
 
