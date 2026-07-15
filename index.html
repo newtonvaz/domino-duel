@@ -83,15 +83,16 @@
         <h2 class="section-title">Nova Partida</h2>
         <p class="subtle">Dominó de 4: monte as duas duplas. Cada rodada vale 6 pontos.</p>
 
+        <datalist id="playersDatalist"></datalist>
         <div class="duo-block">
           <div class="duo-title">Dupla A</div>
-          <div class="field"><select id="selA1"></select></div>
-          <div class="field" style="margin-bottom:0;"><select id="selA2"></select></div>
+          <div class="field"><input type="text" id="selA1" placeholder="Jogador 1..." autocomplete="off"></div>
+          <div class="field" style="margin-bottom:0;"><input type="text" id="selA2" placeholder="Jogador 2..." autocomplete="off"></div>
         </div>
         <div class="duo-block">
           <div class="duo-title team-b">Dupla B</div>
-          <div class="field"><select id="selB1"></select></div>
-          <div class="field" style="margin-bottom:0;"><select id="selB2"></select></div>
+          <div class="field"><input type="text" id="selB1" placeholder="Jogador 1..." autocomplete="off"></div>
+          <div class="field" style="margin-bottom:0;"><input type="text" id="selB2" placeholder="Jogador 2..." autocomplete="off"></div>
         </div>
 
         <div class="field">
@@ -195,7 +196,7 @@
   </div>
 </div>
 
-<script src="js/app.js?v=8"></script>
+<script src="js/app.js?v=9"></script>
 <script>
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(reg => {

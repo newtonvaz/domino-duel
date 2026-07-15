@@ -530,25 +530,28 @@ function renderMatchSetup(){
     if(!dateInput.value) dateInput.value = today;
   }
 
-  const selects = ['selA1','selA2','selB1','selB2'];
-  const labels = ['Jogador 1','Jogador 2','Jogador 1','Jogador 2'];
-  selects.forEach((selId,i)=>{
-    const sel = document.getElementById(selId);
-    if(sel){
-      sel.innerHTML = `<option value="">${labels[i]}...</option>` + data.players.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
-    }
+  const dl = document.getElementById('playersDatalist');
+  if(dl) dl.innerHTML = data.players.map(p => `<option value="${escapeHtml(p.name)}">`).join('');
+
+  const inputs = ['selA1','selA2','selB1','selB2'];
+  inputs.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.setAttribute('list', 'playersDatalist');
   });
+}
+
+function resolvePlayer(name){
+  const p = data.players.find(p => p.name.toLowerCase() === name.trim().toLowerCase());
+  return p ? p.id : null;
 }
 
 function startMatch(){
   if(!user) return;
-  const a1 = document.getElementById('selA1').value;
-  const a2 = document.getElementById('selA2').value;
-  const b1 = document.getElementById('selB1').value;
-  const b2 = document.getElementById('selB2').value;
-  const ids = [a1,a2,b1,b2];
+  const raw = ['selA1','selA2','selB1','selB2'].map(id => document.getElementById(id).value);
   const err = document.getElementById('matchSetupError');
-  if(ids.some(x=>!x)){ err.textContent = 'Selecione os 4 jogadores.'; return; }
+  if(raw.some(x=>!x.trim())){ err.textContent = 'Selecione os 4 jogadores.'; return; }
+  const ids = raw.map(r => resolvePlayer(r));
+  if(ids.some(id => !id)){ err.textContent = 'Jogador n\u00e3o encontrado. Verifique o nome digitado.'; return; }
   if(new Set(ids).size !== 4){ err.textContent = 'Cada jogador s\u00f3 pode aparecer uma vez.'; return; }
   const names = ids.map(id => playerById(id)?.name?.toLowerCase());
   if(names[0] === names[2] || names[0] === names[3] || names[1] === names[2] || names[1] === names[3]){
