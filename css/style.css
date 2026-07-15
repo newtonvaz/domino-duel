@@ -278,25 +278,102 @@ nav.bottom-nav{
 
 
 .placar-close{display:none;position:fixed;top:12px;right:12px;z-index:60;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;align-items:center;justify-content:center;}
-body.placar-mode .placar-close{display:flex;}
+
+/* PLACAR MODE — fullscreen immersivo, funciona em retrato e paisagem */
+body.placar-mode{overflow:hidden;height:100dvh;width:100vw;background:var(--bg);}
 body.placar-mode header.top,
 body.placar-mode #buchudaBanner,
-body.placar-mode nav.bottom-nav{display:none !important;}
-body.placar-mode #liveMatchWrap .btn-row{display:none !important;}
-body.placar-mode .result-panel .btn-row{display:flex !important;}
-body.placar-mode{overflow:hidden;height:100dvh;width:100vw;}
+body.placar-mode nav.bottom-nav,
+body.placar-mode #liveMatchWrap .btn-row,
+body.placar-mode .result-panel{display:none !important;}
+body.placar-mode .placar-close{display:flex;position:fixed;top:8px;right:8px;width:48px;height:48px;font-size:22px;z-index:70;}
 body.placar-mode main{padding:0 !important;margin:0 !important;display:flex;align-items:center;justify-content:center;height:100dvh;width:100vw;overflow:hidden;}
-body.placar-mode .live-board{margin:0 !important;width:100vw;max-width:none;border-radius:0;background:var(--bg);border:none;display:flex;flex-direction:row;align-items:center;justify-content:space-evenly;gap:8px;padding:12px 16px;height:100dvh;box-sizing:border-box;}
-body.placar-mode .live-board .live-team{flex-direction:column;align-items:center;justify-content:center;text-align:center;margin:0;flex:1;height:100%;}
-body.placar-mode .live-board .live-team .who{max-width:none;margin-bottom:8px;font-size:clamp(14px,3vw,22px);}
-body.placar-mode .live-board .vs-divider{writing-mode:lr;margin:0;font-size:clamp(14px,2.5vw,22px);opacity:.6;}
-body.placar-mode .pip-grid.small{display:none;}
-body.placar-mode .score-num{font-size:clamp(48px,14vw,120px);min-width:0;}
-body.placar-mode .score-adj{width:clamp(40px,10vw,72px);height:clamp(40px,10vw,72px);font-size:clamp(22px,5vw,40px);border-radius:14px;}
-body.placar-mode .live-team .names{font-size:clamp(12px,2.5vw,18px);}
-body.placar-mode .live-board .score-editor{flex-direction:column;align-items:center;gap:4px;}
+
+/* live-board: preenche toda a tela */
+body.placar-mode .live-board{
+  margin:0 !important;width:100vw;max-width:none;border-radius:0;
+  background:var(--bg);border:none;
+  display:flex;flex-direction:row;align-items:center;justify-content:center;
+  gap:0;padding:0;height:100dvh;box-sizing:border-box;
+}
+
+/* cada time ocupa metade */
+body.placar-mode .live-board .live-team{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  margin:0;padding:8px 4px;height:100%;box-sizing:border-box;
+}
+
+/* nomes dos jogadores */
+body.placar-mode .live-board .live-team .who{
+  max-width:none;margin-bottom:auto;padding-top:max(env(safe-area-inset-top,12px),12px);
+  text-align:center;
+}
+body.placar-mode .live-board .live-team .label{font-size:clamp(11px,2.5vw,16px);opacity:.5;text-transform:uppercase;letter-spacing:1px;}
+body.placar-mode .live-team .names{font-size:clamp(13px,3.2vw,20px);font-weight:600;}
+
+/* score-editor: ocupa o centro da tela */
+body.placar-mode .live-board .score-editor{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+  flex:1;width:100%;
+}
 body.placar-mode .live-board .score-editor .pip-grid{display:none;}
-body.placar-mode .placar-close{top:auto;bottom:12px;right:12px;width:44px;height:44px;font-size:20px;z-index:70;}
+
+/* placar: gigante */
+body.placar-mode .score-num{
+  font-size:min(38dvw,28dvh);
+  min-width:0;padding:0;line-height:1;
+  user-select:none;-webkit-user-select:none;
+}
+
+/* botoes +/- grandes o suficiente para tocar */
+body.placar-mode .score-adj{
+  width:min(20dvw,16dvh);height:min(20dvw,16dvh);
+  font-size:min(10dvw,8dvh);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  margin:4px 0;padding:0;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text);cursor:pointer;
+}
+
+/* vs divider no centro */
+body.placar-mode .live-board .vs-divider{
+  writing-mode:horizontal-tb;margin:0;
+  font-size:clamp(16px,3vw,28px);opacity:.4;
+  flex-shrink:0;padding:0 4px;
+}
+
+/* esconder pip grid */
+body.placar-mode .pip-grid.small{display:none;}
+
+/* resultado quando acaba */
+body.placar-mode .result-panel{display:none !important;}
+
+/* ---- MEDIA QUERIES por orientacao ---- */
+
+/* LANDSCAPE (celular deitado) */
+@media (orientation:landscape) and (max-height:500px){
+  body.placar-mode .live-board .live-team .who{padding-top:max(env(safe-area-inset-top,4px),4px);}
+  body.placar-mode .live-board .live-team .label{font-size:11px;}
+  body.placar-mode .live-team .names{font-size:13px;margin-bottom:2px;}
+  body.placar-mode .score-num{font-size:min(36dvw,55dvh);}
+  body.placar-mode .score-adj{width:min(18dvw,28dvh);height:min(18dvw,28dvh);font-size:min(9dvw,14dvh);}
+  body.placar-mode .live-board .vs-divider{font-size:18px;}
+  body.placar-mode .placar-close{top:4px;right:4px;width:40px;height:40px;font-size:18px;}
+}
+
+/* PORTRAIT (celular em pe) */
+@media (orientation:portrait){
+  body.placar-mode .live-board{
+    flex-direction:row;
+  }
+  body.placar-mode .live-board .live-team{
+    flex:1;padding:16px 8px;
+    padding-top:max(env(safe-area-inset-top,16px),16px);
+    padding-bottom:max(env(safe-area-inset-bottom,16px),16px);
+  }
+  body.placar-mode .score-num{font-size:min(32vw,18dvh);}
+  body.placar-mode .score-adj{width:min(16vw,10dvh);height:min(16vw,10dvh);font-size:min(8vw,5dvh);}
+  body.placar-mode .live-board .vs-divider{writing-mode:vertical-lr;font-size:20px;padding:0 2px;}
+}
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}

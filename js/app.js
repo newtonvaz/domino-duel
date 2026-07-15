@@ -675,17 +675,11 @@ function exitFullscreen(){
   return Promise.resolve();
 }
 
-function lockLandscape(){
-  const lock = (o) => screen.orientation.lock(o);
-  return lock('landscape-primary').catch(()=> lock('landscape')).catch(()=>{});
-}
-
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    goFullscreen().then(()=> lockLandscape()).catch(()=> lockLandscape());
+    goFullscreen();
   } else {
-    try { screen.orientation.unlock(); }catch(e){}
     exitFullscreen();
   }
 }
@@ -693,7 +687,6 @@ function togglePlacarMode(){
 function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
-  try { screen.orientation.unlock(); }catch(e){}
   exitFullscreen();
 }
 
