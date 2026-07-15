@@ -653,8 +653,24 @@ function renderLiveMatch(){
       <button class="btn btn-secondary" onclick="undoPoint()">\u21ba Desfazer</button>
       <button class="btn btn-danger" onclick="cancelMatch()">Cancelar Partida</button>
     </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-secondary" onclick="togglePlacarMode()">\u{1F4CB} Modo Placar</button>
+    </div>
   `;
 }
+
+function togglePlacarMode(){
+  document.body.classList.toggle('placar-mode');
+  if(document.body.classList.contains('placar-mode')){
+    screen.orientation.lock('landscape').catch(() => {});
+  } else {
+    screen.orientation.unlock();
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.body.classList.contains('placar-mode')) togglePlacarMode();
+});
 
 function adjustScore(team, delta){
   if(!user) return;

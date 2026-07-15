@@ -277,6 +277,14 @@ nav.bottom-nav{
 #buchudaBanner{background:#8b1a2b;color:#fff;text-align:center;font-weight:700;font-size:12px;padding:7px 14px;letter-spacing:.5px;}
 
 
+body.placar-mode header.top,
+body.placar-mode #buchudaBanner,
+body.placar-mode nav.bottom-nav{display:none !important;}
+body.placar-mode #liveMatchWrap .btn-row{display:none !important;}
+body.placar-mode .result-panel .btn-row{display:flex !important;}
+body.placar-mode main{padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;}
+
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
 
