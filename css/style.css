@@ -284,16 +284,16 @@ body.placar-mode #buchudaBanner,
 body.placar-mode nav.bottom-nav{display:none !important;}
 body.placar-mode #liveMatchWrap .btn-row{display:none !important;}
 body.placar-mode .result-panel .btn-row{display:flex !important;}
-body.placar-mode main{padding:0;display:flex;align-items:center;justify-content:center;min-height:100dvh;height:100dvh;}
-body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;display:flex;flex-direction:row;align-items:center;justify-content:space-evenly;gap:clamp(6px,2vw,20px);padding:clamp(12px,2vw,24px);height:100dvh;box-sizing:border-box;}
+body.placar-mode main{padding:0;display:flex;align-items:center;justify-content:center;height:100dvh;width:100vw;overflow:hidden;}
+body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;display:flex;flex-direction:row;align-items:center;justify-content:space-evenly;gap:2px;padding:4px;height:100dvh;box-sizing:border-box;overflow:hidden;}
 body.placar-mode .live-board .live-team{flex-direction:column;align-items:center;text-align:center;margin:0;flex:1;justify-content:center;}
-body.placar-mode .live-board .live-team .who{max-width:none;margin-bottom:clamp(4px,1.5vw,12px);}
-body.placar-mode .live-board .vs-divider{writing-mode:lr;margin:0;font-size:clamp(14px,2.5vw,22px);}
+body.placar-mode .live-board .live-team .who{max-width:none;margin-bottom:clamp(2px,1dvh,8px);}
+body.placar-mode .live-board .vs-divider{writing-mode:lr;margin:0;font-size:clamp(14px,2dvh,22px);}
 body.placar-mode .pip-grid.small{display:none;}
-body.placar-mode .score-num{font-size:clamp(64px,18vw,150px);min-width:0;line-height:1;}
-body.placar-mode .score-adj{width:clamp(52px,14vw,90px);height:clamp(52px,14vw,90px);font-size:clamp(26px,6vw,44px);border-radius:clamp(10px,2vw,18px);}
-body.placar-mode .live-team .names{font-size:clamp(15px,3vw,22px);}
-body.placar-mode .live-board .score-editor{flex-direction:column;align-items:center;gap:clamp(2px,1vw,8px);}
+body.placar-mode .score-num{font-size:min(50dvh,30vw);min-width:0;line-height:1;}
+body.placar-mode .score-adj{width:min(18dvh,14vw);height:min(18dvh,14vw);font-size:min(9dvh,7vw);border-radius:min(3dvh,2vw);}
+body.placar-mode .live-team .names{font-size:min(5dvh,4vw);}
+body.placar-mode .live-board .score-editor{flex-direction:column;align-items:center;gap:clamp(1px,0.8dvh,4px);}
 body.placar-mode .live-board .score-editor .pip-grid{display:none;}
 
 ::-webkit-scrollbar{width:6px;}
