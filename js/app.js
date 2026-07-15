@@ -627,46 +627,105 @@ function renderLiveMatch(){
   }
 
   wrap.innerHTML = `
-    <div class="live-board">
-      <button class="placar-close" onclick="exitPlacarMode()" title="Sair do Modo Placar">\u2715</button>
-      <div class="live-team">
-        <div class="who"><div class="label">Dupla A</div><div class="names">${teamAName}</div></div>
-        <div class="score-editor">
-          <button class="score-adj" onclick="adjustScore('A',-1)" ${matchState.scoreA<=0?'disabled':''}>\u2212</button>
-          <span class="score-num" id="scoreNumA" onclick="editScore('A')">${matchState.scoreA}</span>
-          <button class="score-adj" onclick="adjustScore('A',1)" ${matchState.scoreA>=6?'disabled':''}>+</button>
-          ${pipsHTML(matchState.scoreA, true)}
+    <div class="placar-overlay">
+      <button class="placar-close" onclick="exitPlacarMode()" title="Sair do Modo Placar">&#x2715;</button>
+      <div class="live-board">
+        <div class="live-team">
+          <div class="who"><div class="label">Dupla A</div><div class="names">${teamAName}</div></div>
+          <div class="score-editor">
+            <button class="score-adj" onclick="adjustScore('A',-1)" ${matchState.scoreA<=0?'disabled':''}>&minus;</button>
+            <span class="score-num" id="scoreNumA" onclick="editScore('A')">${matchState.scoreA}</span>
+            <button class="score-adj" onclick="adjustScore('A',1)" ${matchState.scoreA>=6?'disabled':''}>+</button>
+            ${pipsHTML(matchState.scoreA, true)}
+          </div>
+        </div>
+        <div class="vs-divider">&mdash; &times; &mdash;</div>
+        <div class="live-team">
+          <div class="who"><div class="label">Dupla B</div><div class="names">${teamBName}</div></div>
+          <div class="score-editor">
+            <button class="score-adj" onclick="adjustScore('B',-1)" ${matchState.scoreB<=0?'disabled':''}>&minus;</button>
+            <span class="score-num" id="scoreNumB" onclick="editScore('B')">${matchState.scoreB}</span>
+            <button class="score-adj" onclick="adjustScore('B',1)" ${matchState.scoreB>=6?'disabled':''}>+</button>
+            ${pipsHTML(matchState.scoreB, true)}
+          </div>
         </div>
       </div>
-      <div class="vs-divider">\u2014 \u00d7 \u2014</div>
-      <div class="live-team">
-        <div class="who"><div class="label">Dupla B</div><div class="names">${teamBName}</div></div>
-        <div class="score-editor">
-          <button class="score-adj" onclick="adjustScore('B',-1)" ${matchState.scoreB<=0?'disabled':''}>\u2212</button>
-          <span class="score-num" id="scoreNumB" onclick="editScore('B')">${matchState.scoreB}</span>
-          <button class="score-adj" onclick="adjustScore('B',1)" ${matchState.scoreB>=6?'disabled':''}>+</button>
-          ${pipsHTML(matchState.scoreB, true)}
-        </div>
+      ${resultHTML}
+    </div>
+    <div class="normal-controls">
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="undoPoint()">&#x21ba; Desfazer</button>
+        <button class="btn btn-danger" onclick="cancelMatch()">Cancelar Partida</button>
       </div>
-    </div>
-    ${resultHTML}
-    <div class="btn-row">
-      <button class="btn btn-secondary" onclick="undoPoint()">\u21ba Desfazer</button>
-      <button class="btn btn-danger" onclick="cancelMatch()">Cancelar Partida</button>
-    </div>
-    <div class="btn-row" style="margin-top:8px;">
-      <button class="btn btn-secondary" onclick="togglePlacarMode()">\u{1F4CB} Modo Placar</button>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-placar" onclick="togglePlacarMode()">Modo Placar</button>
+      </div>
     </div>
   `;
 }
 
+/* ---------- ORIENTATION MANAGER ---------- */
+const OrientationMgr = (function(){
+  let _placarActive = false;
+
+  function _lockPortrait(){
+    if(screen.orientation && screen.orientation.lock){
+      screen.orientation.lock('portrait').catch(()=>{});
+    }
+  }
+
+  function _unlock(){
+    if(screen.orientation && screen.orientation.unlock){
+      try { screen.orientation.unlock(); } catch(e){}
+    }
+  }
+
+  function init(){
+    // Normal mode starts locked to portrait
+    _lockPortrait();
+    
+    // Re-enforce portrait if the user rotates device while not in placar mode
+    if(screen.orientation){
+      screen.orientation.addEventListener('change', () => {
+        if(!_placarActive) _lockPortrait();
+      });
+    }
+    const mql = window.matchMedia('(orientation: landscape)');
+    if(mql.addEventListener){
+      mql.addEventListener('change', (e) => {
+        if(e.matches && !_placarActive) _lockPortrait();
+      });
+    }
+  }
+
+  function enterPlacar(){
+    _placarActive = true;
+    document.body.classList.add('placar-mode');
+    // Allow user to freely rotate device to landscape for the big scoreboard
+    _unlock();
+  }
+
+  function exitPlacar(){
+    if(!_placarActive) return;
+    _placarActive = false;
+    document.body.classList.remove('placar-mode');
+    // Lock back to portrait when exiting
+    _lockPortrait();
+  }
+
+  return { init, enterPlacar, exitPlacar };
+})();
+
 function togglePlacarMode(){
-  document.body.classList.toggle('placar-mode');
+  if(document.body.classList.contains('placar-mode')){
+    OrientationMgr.exitPlacar();
+  } else {
+    OrientationMgr.enterPlacar();
+  }
 }
 
 function exitPlacarMode(){
-  if(!document.body.classList.contains('placar-mode')) return;
-  document.body.classList.remove('placar-mode');
+  OrientationMgr.exitPlacar();
 }
 
 document.addEventListener('keydown', e => {
@@ -1112,15 +1171,7 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
-  (function lockPortrait(){
-    if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{});
-    if(screen.orientation) screen.orientation.addEventListener('change', ()=>{
-      if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{});
-    });
-    const mql = window.matchMedia('(orientation:landscape)');
-    if(mql.addEventListener) mql.addEventListener('change', e=>{ if(e.matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{}); });
-    setInterval(()=>{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{}); }, 2000);
-  })();
+  OrientationMgr.init();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
       setInterval(() => reg.update(), 3000);

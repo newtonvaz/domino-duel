@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
+/* Prevent white background on html element */
+html { background: #0a0c11; }
+
+
 :root{
   --bg:#0a0c11;
   --surface:#12151d;
@@ -140,6 +144,24 @@ p.subtle{color:var(--text-muted);font-size:13px;margin:-8px 0 16px;}
 .btn-secondary:hover{border-color:var(--gold-deep);}
 .btn-danger{background:transparent;color:var(--red);border:1px solid #4a2530;}
 .btn-ghost{background:transparent;color:var(--text-muted);border:1px dashed var(--border);}
+.btn-placar{
+  background:linear-gradient(135deg, var(--surface-3), var(--surface-2));
+  color:var(--gold-soft);
+  border:1px solid var(--gold-deep);
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  box-shadow:0 4px 15px rgba(232,178,61,0.15);
+  transition:all 0.2s ease;
+}
+.btn-placar:hover{
+  background:linear-gradient(135deg, var(--surface-2), #2a3243);
+  box-shadow:0 6px 20px rgba(232,178,61,0.25);
+  transform:translateY(-2px);
+}
+.btn-placar:active{
+  transform:translateY(0);
+}
 .btn-row{display:flex;gap:10px;}
 .btn-row .btn{width:auto;flex:1;}
 
@@ -276,25 +298,248 @@ nav.bottom-nav{
 
 #buchudaBanner{background:#8b1a2b;color:#fff;text-align:center;font-weight:700;font-size:12px;padding:7px 14px;letter-spacing:.5px;}
 
-
 .placar-close{display:none;position:fixed;top:12px;right:12px;z-index:60;background:var(--surface-2);border:1px solid var(--border);color:var(--text-muted);width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;align-items:center;justify-content:center;}
 body.placar-mode .placar-close{display:flex;}
 body.placar-mode header.top,
 body.placar-mode #buchudaBanner,
 body.placar-mode nav.bottom-nav{display:none !important;}
-body.placar-mode #liveMatchWrap .btn-row{display:none !important;}
-body.placar-mode .result-panel .btn-row{display:flex !important;}
-body.placar-mode main{padding:0;display:flex;align-items:center;justify-content:center;height:100dvh;width:100vw;overflow:hidden;}
-body.placar-mode .live-board{margin:0;width:100%;max-width:none;border-radius:0;background:var(--bg);border:none;display:flex;flex-direction:row;align-items:center;justify-content:space-evenly;gap:2px;padding:4px;height:100dvh;box-sizing:border-box;overflow:hidden;}
-body.placar-mode .live-board .live-team{flex-direction:column;align-items:center;text-align:center;margin:0;flex:1;justify-content:center;}
-body.placar-mode .live-board .live-team .who{max-width:none;margin-bottom:clamp(2px,1dvh,8px);}
-body.placar-mode .live-board .vs-divider{writing-mode:lr;margin:0;font-size:clamp(14px,2dvh,22px);}
-body.placar-mode .pip-grid.small{display:none;}
-body.placar-mode .score-num{font-size:min(35dvh,25vw);min-width:0;line-height:1;}
-body.placar-mode .score-adj{width:min(16dvh,14vw);height:min(16dvh,14vw);font-size:min(8dvh,7vw);border-radius:min(1.5dvh,1.5vw);}
-body.placar-mode .live-team .names{font-size:min(4.5dvh,4vw);}
-body.placar-mode .live-board .score-editor{flex-direction:column;align-items:center;gap:clamp(1px,0.5dvh,3px);}
-body.placar-mode .live-board .score-editor .pip-grid{display:none;}
+body.placar-mode .normal-controls{display:none !important;}
+
+/* =====================================================
+   PLACAR-MODE: fullscreen landscape via fixed overlay
+   .placar-overlay covers 100vw x 100vh on top of all,
+   escaping the .app-shell max-width constraint.
+   ===================================================== */
+
+/* The overlay fills the entire screen, fixed */
+body.placar-mode .placar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* =====================================================
+   PLACAR-MODE: Responsive fullscreen overlay
+   Escapes the .app-shell max-width constraint.
+   ===================================================== */
+
+/* The overlay fills the entire screen, fixed */
+body.placar-mode .placar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.placar-mode .live-board {
+  flex: 1;
+  margin: 0;
+  width: 100%;
+  border-radius: 0;
+  background: var(--bg);
+  border: none;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-height: 0;
+}
+
+body.placar-mode .live-board .live-team {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-width: 0;
+}
+
+body.placar-mode .live-board .vs-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* Team label (Dupla A / B) */
+body.placar-mode .live-board .live-team .who {
+  width: 100%;
+}
+body.placar-mode .live-board .live-team .who .label {
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+body.placar-mode .live-board .live-team .names {
+  font-weight: 700;
+  color: var(--ivory);
+  line-height: 1.2;
+  word-break: break-word;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Score number — the hero element */
+body.placar-mode .score-num {
+  min-width: 0;
+  line-height: 1;
+  display: block;
+}
+
+/* Score editor: horizontal row per team */
+body.placar-mode .live-board .score-editor {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+/* Hide pip grids — not useful at this size */
+body.placar-mode .pip-grid,
+body.placar-mode .pip-grid.small {
+  display: none;
+}
+
+/* Result panel fixed at bottom of overlay */
+body.placar-mode .placar-overlay > .result-panel {
+  flex-shrink: 0;
+  background: rgba(10,12,17,0.97);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border);
+  padding: clamp(8px, 1.8vh, 16px) clamp(12px, 2vw, 24px);
+}
+body.placar-mode .placar-overlay > .result-panel .win-tag {
+  font-size: clamp(14px, 3vh, 24px);
+  margin-bottom: 6px;
+}
+body.placar-mode .placar-overlay > .result-panel .badges {
+  margin: 6px 0;
+}
+body.placar-mode .placar-overlay > .result-panel .btn-row {
+  display: flex !important;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+body.placar-mode .placar-overlay > .result-panel .btn-row .btn {
+  max-width: 180px;
+  font-size: clamp(12px, 1.8vh, 15px);
+  padding: clamp(8px, 1.4vh, 12px) 16px;
+}
+/* Hide the subtle instruction text in placar mode to save space */
+body.placar-mode .placar-overlay .result-panel p.subtle {
+  display: none;
+}
+
+/* =========================================
+   PORTRAIT PLACAR MODE
+   Stacked vertically for normal viewing
+   ========================================= */
+@media (orientation: portrait) {
+  body.placar-mode .live-board {
+    flex-direction: column;
+  }
+  body.placar-mode .live-board .live-team {
+    padding: clamp(10px, 4vh, 30px);
+    gap: clamp(6px, 1.5vh, 12px);
+  }
+  body.placar-mode .live-board .vs-divider {
+    writing-mode: horizontal-tb;
+    width: 100%;
+    height: clamp(24px, 5vh, 48px);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    border-left: none;
+    border-right: none;
+    padding: 0;
+    font-size: clamp(12px, 2vh, 18px);
+    letter-spacing: 4px;
+  }
+  body.placar-mode .live-board .live-team .who .label {
+    font-size: clamp(10px, 1.8vh, 14px);
+    margin-bottom: 4px;
+  }
+  body.placar-mode .live-board .live-team .names {
+    font-size: clamp(16px, 3.5vh, 32px);
+  }
+  body.placar-mode .score-num {
+    font-size: clamp(60px, 15vh, 150px);
+  }
+  body.placar-mode .score-adj {
+    width: clamp(36px, 6vh, 60px);
+    height: clamp(36px, 6vh, 60px);
+    font-size: clamp(18px, 3vh, 28px);
+    border-radius: 12px;
+  }
+  body.placar-mode .live-board .score-editor {
+    gap: clamp(8px, 3vw, 24px);
+  }
+}
+
+/* =========================================
+   LANDSCAPE PLACAR MODE
+   Side by side, giant text
+   ========================================= */
+@media (orientation: landscape) {
+  body.placar-mode .live-board {
+    flex-direction: row;
+  }
+  body.placar-mode .live-board .live-team {
+    padding: clamp(8px, 2vw, 24px);
+    gap: clamp(4px, 1vh, 10px);
+  }
+  body.placar-mode .live-board .vs-divider {
+    writing-mode: vertical-lr;
+    height: 100%;
+    width: clamp(16px, 2.5vw, 32px);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-top: none;
+    border-bottom: none;
+    padding: 8px 0;
+    font-size: clamp(10px, 1.8vh, 16px);
+    letter-spacing: 3px;
+  }
+  body.placar-mode .live-board .live-team .who .label {
+    font-size: clamp(12px, 2.5vh, 20px);
+    margin-bottom: 4px;
+  }
+  body.placar-mode .live-board .live-team .names {
+    font-size: clamp(20px, 6vh, 48px);
+  }
+  body.placar-mode .score-num {
+    font-size: clamp(80px, 40vh, 280px);
+  }
+  body.placar-mode .score-adj {
+    width: clamp(40px, 10vh, 80px);
+    height: clamp(40px, 10vh, 80px);
+    font-size: clamp(20px, 5vh, 40px);
+    border-radius: clamp(8px, 1.5vh, 18px);
+  }
+  body.placar-mode .live-board .score-editor {
+    gap: clamp(4px, 1.2vw, 16px);
+  }
+}
 
 ::-webkit-scrollbar{width:6px;}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
