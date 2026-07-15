@@ -660,19 +660,23 @@ function renderLiveMatch(){
   `;
 }
 
+function lockOrientation(o){
+  try { screen.orientation.lock(o); } catch(e) { try { screen.orientation.lock(o === 'landscape' ? 'landscape-secondary' : 'portrait'); } catch(e2) {} }
+}
+
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    try { screen.orientation.lock('landscape'); } catch(e) { try { screen.orientation.lock('landscape-secondary'); } catch(e2) {} }
+    lockOrientation('landscape');
   } else {
-    try { screen.orientation.unlock(); } catch(e) {}
+    lockOrientation('portrait');
   }
 }
 
 function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
-  try { screen.orientation.unlock(); } catch(e) {}
+  lockOrientation('portrait');
 }
 
 document.addEventListener('keydown', e => {
@@ -1118,6 +1122,7 @@ function renderRanking(){
   window.addEventListener('focus', () => {
     refreshFromServer();
   });
+  try { screen.orientation.lock('portrait'); } catch(e) {}
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
       setInterval(() => reg.update(), 3000);
