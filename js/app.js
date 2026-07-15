@@ -663,18 +663,16 @@ function renderLiveMatch(){
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    if(screen.orientation && screen.orientation.lock){
-      screen.orientation.lock('landscape-secondary').catch(() => screen.orientation.lock('landscape').catch(() => {}));
-    }
+    try { screen.orientation.lock('landscape'); } catch(e) { try { screen.orientation.lock('landscape-secondary'); } catch(e2) {} }
   } else {
-    if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+    try { screen.orientation.unlock(); } catch(e) {}
   }
 }
 
 function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
-  screen.orientation.unlock();
+  try { screen.orientation.unlock(); } catch(e) {}
 }
 
 document.addEventListener('keydown', e => {
