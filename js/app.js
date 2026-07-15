@@ -660,23 +660,13 @@ function renderLiveMatch(){
   `;
 }
 
-function lockOrientation(o){
-  try { screen.orientation.lock(o); } catch(e) { try { screen.orientation.lock(o === 'landscape' ? 'landscape-secondary' : 'portrait'); } catch(e2) {} }
-}
-
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
-  if(document.body.classList.contains('placar-mode')){
-    lockOrientation('landscape');
-  } else {
-    lockOrientation('portrait');
-  }
 }
 
 function exitPlacarMode(){
   if(!document.body.classList.contains('placar-mode')) return;
   document.body.classList.remove('placar-mode');
-  lockOrientation('portrait');
 }
 
 document.addEventListener('keydown', e => {
