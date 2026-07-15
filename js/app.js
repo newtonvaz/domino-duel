@@ -663,7 +663,7 @@ function renderLiveMatch(){
 function togglePlacarMode(){
   document.body.classList.toggle('placar-mode');
   if(document.body.classList.contains('placar-mode')){
-    screen.orientation.lock('landscape').catch(() => {});
+    screen.orientation.lock('landscape-secondary').catch(() => {});
   } else {
     screen.orientation.unlock();
   }
