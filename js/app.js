@@ -1,5 +1,5 @@
 /* ---------- API (MySQL) ---------- */
-const API_URL = 'https://dominoduelpro.freedev.app/api/index.php';
+const API_URL = window.location.protocol.startsWith('http') ? 'api/index.php' : 'https://dominoduelpro.freedev.app/api/index.php';
 const STORAGE_KEY = 'duelo_domino_data_v1';
 let data = {players:[], matches:[], settings:{}};
 
@@ -344,6 +344,7 @@ async function refreshFromServer(){
     modoBuchuda = settingsRemote.modo_buchuda;
     localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
     updateBuchudaUI();
+    updateHistoryTabs();
   }
   const activeView = document.querySelector('.view.active');
   if(activeView){
@@ -362,7 +363,7 @@ function startPolling(){
     await refreshFromServer();
     renderPendingUsers();
     if (isSyncNeeded()) retrySync();
-  }, 1000);
+  }, 5000);
 }
 
 function stopPolling(){
@@ -911,6 +912,9 @@ function renderHistory(skipReRender){
   if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
   let matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(modoBuchuda) {
+    matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
+  }
   if(historyFilter === 'buchuda') matches = matches.filter(m => m.buchuda);
   if(historyFilter === 're') matches = matches.filter(m => m.buchudaDeRe);
   if(matches.length===0){
@@ -1170,6 +1174,7 @@ function renderRanking(){
   startPolling();
   await syncFromServer();
   updateBuchudaUI();
+  updateHistoryTabs();
   renderHome();
   if (isSyncNeeded()) retrySync();
   window.addEventListener('online', retrySync);
@@ -1196,8 +1201,16 @@ async function checkAppUpdate(){
   const key = 'app_js_v';
   const last = localStorage.getItem(key);
   const cur = res.size + ':' + res.mtime;
-  if(last && last !== cur) location.reload();
-  localStorage.setItem(key, cur);
+  if(last && last !== cur){
+    localStorage.setItem(key, cur);
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.ready.then(reg => reg.update());
+    } else {
+      location.reload();
+    }
+  } else {
+    localStorage.setItem(key, cur);
+  }
 }
 
 async function syncFromServer(){

@@ -3,6 +3,7 @@ require_once __DIR__ . '/config.php';
 
 $action = $_GET['action'] ?? '';
 
+try {
 switch ($action) {
 
     /* ---------- PLAYERS ---------- */
@@ -37,22 +38,6 @@ switch ($action) {
             $pdo->commit();
             echo json_encode(['success' => true]);
         } catch (PDOException $e) {
-            $pdo->rollBack();
-            http_response_code(500);
-            echo json_encode(['error' => $e->getMessage()]);
-        }
-            $toDelete = array_diff($existing, $incoming);
-            if ($toDelete) {
-                $placeholders = implode(',', array_fill(0, count($toDelete), '?'));
-                $pdo->prepare("DELETE FROM players WHERE id IN ($placeholders)")->execute(array_values($toDelete));
-            }
-            $stmt = $pdo->prepare('REPLACE INTO players (id, name, photo) VALUES (?, ?, ?)');
-            foreach ($players as $p) {
-                $stmt->execute([$p['id'], $p['name'], $p['photo'] ?? null]);
-            }
-            $pdo->commit();
-            echo json_encode(['ok' => true]);
-        } catch (Exception $e) {
             $pdo->rollBack();
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
@@ -251,4 +236,8 @@ switch ($action) {
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Unknown action']);
+}
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database/Server Error: ' . $e->getMessage()]);
 }

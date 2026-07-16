@@ -1,5 +1,15 @@
 AddType application/manifest+json json
 AddType image/png png
+
+# Prevent caching of service worker, manifest, and main index.html to allow instant updates
+<FilesMatch "^(sw\.js|manifest\.json|index\.html)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </IfModule>
+</FilesMatch>
+
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType image/png "access plus 1 year"

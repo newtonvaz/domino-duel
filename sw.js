@@ -35,11 +35,12 @@ self.addEventListener('message', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // Only handle GET requests. POST/PUT/DELETE bypass service worker cache completely
+  if (e.request.method !== 'GET') return;
+
   const url = new URL(e.request.url);
   if (url.pathname === '/manifest.json' || url.pathname.startsWith('/icons/')) {
     e.respondWith(cacheFirst(e.request));
-  } else if (url.pathname.startsWith('/api/')) {
-    e.respondWith(networkFirst(e.request));
   } else {
     e.respondWith(networkFirst(e.request));
   }
@@ -60,7 +61,11 @@ async function cacheFirst(req) {
 
 async function networkFirst(req) {
   try {
-    const res = await fetch(req);
+    const url = new URL(req.url);
+    const isAsset = url.pathname === '/' || url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+    // Force validation with the server to bypass browser's HTTP cache when fetching main assets
+    const options = isAsset ? { cache: 'no-cache' } : {};
+    const res = await fetch(req, options);
     const cache = await caches.open(CACHE);
     cache.put(req, res.clone());
     return res;
