@@ -18,6 +18,29 @@ switch ($action) {
         try {
             $existing = $pdo->query('SELECT id FROM players')->fetchAll(PDO::FETCH_COLUMN);
             $incoming = array_map(fn($p) => $p['id'], $players);
+            
+            // Delete players not in incoming list
+            $toDelete = array_diff($existing, $incoming);
+            if ($toDelete) {
+                $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
+                foreach ($toDelete as $id) {
+                    $stmt->execute([$id]);
+                }
+            }
+            
+            // Insert or update players
+            $stmt = $pdo->prepare('INSERT INTO players (id, name, photo) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, photo = ?');
+            foreach ($players as $player) {
+                $stmt->execute([$player['id'], $player['name'], $player['photo'], $player['name'], $player['photo']]);
+            }
+            
+            $pdo->commit();
+            echo json_encode(['success' => true]);
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
             $toDelete = array_diff($existing, $incoming);
             if ($toDelete) {
                 $placeholders = implode(',', array_fill(0, count($toDelete), '?'));

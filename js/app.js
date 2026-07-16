@@ -45,14 +45,22 @@ function updateSyncUI() {
 }
 
 async function saveData(){
-  saveLocal();
-  const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
-  const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
-  if (playersRes && playersRes.ok && matchesRes && matchesRes.ok) {
-    api('saveBackup', {players: data.players, matches: data.matches});
-    clearSyncNeeded();
-  } else {
+  try {
+    saveLocal();
+    const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
+    const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
+    
+    if (playersRes?.success !== false && matchesRes?.success !== false) {
+      await api('saveBackup', {players: data.players, matches: data.matches});
+      clearSyncNeeded();
+      return true;
+    } else {
+      markSyncNeeded();
+      return false;
+    }
+  } catch (e) {
     markSyncNeeded();
+    return false;
   }
 }
 
@@ -954,8 +962,8 @@ async function deleteMatch(id){
   if(!user || user.role !== 'admin'){ alert('Apenas admin pode remover duelos.'); return; }
   const match = data.matches.find(m=>m.id===id);
   if(!match) return;
-  const teamAName = `${playerName(match.teamA[0])} &amp; ${playerName(match.teamA[1])}`;
-  const teamBName = `${playerName(match.teamB[0])} &amp; ${playerName(match.teamB[1])}`;
+  const teamAName = `${playerName(match.teamA[0])} & ${playerName(match.teamA[1])}`;
+  const teamBName = `${playerName(match.teamB[0])} & ${playerName(match.teamB[1])}`;
   if(!confirm(`Remover este duelo?\n${teamAName} ${match.scoreA}x${match.scoreB} ${teamBName}`)) return;
   data.matches = data.matches.filter(m=>m.id!==id);
   await saveData();
