@@ -121,7 +121,7 @@ async function api(method, body){
         // Login/registro precisam devolver ao chamador os detalhes do backend
         // mesmo quando a resposta é 401/409. O login usa esse retorno para
         // oferecer a troca de senha somente na primeira tentativa elegível.
-        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery' || method === 'resetUserPassword'){
+        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery' || method === 'resetUserPassword' || method === 'forceUserPasswordChange'){
           try{
             const payload = await res.json();
             if(payload && typeof payload === 'object') return payload;
@@ -344,6 +344,14 @@ async function checkSession(){
   }
   const session = await api('session');
   if(session && session.ok){
+    if(session.password_change_required && !(await requestFirstAccessPasswordChange())){
+      user = null;
+      localStorage.removeItem('duelo_user');
+      localStorage.removeItem('duelo_access_token');
+      localStorage.removeItem('duelo_refresh_token');
+      updateAuthUI();
+      return;
+    }
     user = {email: session.email, role: session.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
   } else {
@@ -454,6 +462,13 @@ async function submitLogin(){
   if(res && res.ok){
     if(res.access_token) localStorage.setItem('duelo_access_token', res.access_token);
     if(res.refresh_token) localStorage.setItem('duelo_refresh_token', res.refresh_token);
+    if(res.password_change_required && !(await requestFirstAccessPasswordChange())){
+      localStorage.removeItem('duelo_access_token');
+      localStorage.removeItem('duelo_refresh_token');
+      err.textContent = 'A troca de senha é obrigatória para continuar.';
+      shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
+      return;
+    }
     user = {email: res.email, role: res.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
     updateAuthUI();
@@ -667,6 +682,21 @@ async function submitUserPasswordReset(){
   error.textContent = (response && response.error) || 'Não foi possível redefinir a senha.';
 }
 
+async function forceUserPasswordChange(id, encodedEmail){
+  if(!user || user.role !== 'admin') return;
+  const email = decodeURIComponent(encodedEmail || '');
+  if(!window.confirm(`Exigir troca de senha para ${email}?`)) return;
+  const response = await api('forceUserPasswordChange', {id});
+  if(!(response && response.ok)){
+    window.alert((response && response.error) || 'Não foi possível exigir a troca de senha.');
+    return;
+  }
+  window.alert('A troca de senha será exigida no próximo acesso.');
+  if(user.email === email){
+    logout();
+  }
+}
+
 function logout(){
   stopPolling();
   api('logout');
@@ -794,7 +824,7 @@ function renderPendingUsers(){
     usersList.innerHTML = approved.length ? approved.map(u => `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
         <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:var(--text-muted);">${u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'}</small></div>
-        <button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="openUserPasswordModal('${u.id}','${encodeURIComponent(u.email)}')">Redefinir senha</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="openUserPasswordModal('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Redefinir senha</button><button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Forçar troca</button></div>
       </div>
     `).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário aprovado.</p></div>';
   });

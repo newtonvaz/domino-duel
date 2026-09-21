@@ -406,6 +406,39 @@ switch ($action) {
             ]);
             break;
         }
+        supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($id),
+            ['password_change_required' => false, 'password_reset_offered' => true],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => true]);
+        break;
+
+    case 'forceUserPasswordChange':
+        if (!requireSupabaseAdmin()) break;
+        $input = jsonInput();
+        $id = (string) ($input['id'] ?? '');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Usuário inválido.']);
+            break;
+        }
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($id),
+            ['password_change_required' => true, 'password_reset_offered' => false],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            http_response_code($response['status'] === 0 ? 500 : 400);
+            echo json_encode(['error' => 'Não foi possível exigir a troca de senha.']);
+            break;
+        }
         echo json_encode(['ok' => true]);
         break;
 
