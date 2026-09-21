@@ -375,6 +375,87 @@ switch ($action) {
         echo json_encode(['ok' => true]);
         break;
 
+    // Bootstrap/recuperação do admin raiz: cria ou redefine a senha no
+    // Supabase Auth e garante o perfil admin aprovado. Exige o segredo
+    // ROOT_SETUP_SECRET e força a troca de senha no primeiro acesso.
+    case 'setupRootAdmin':
+        $input = jsonInput();
+        $secret = (string) ($input['secret'] ?? $_GET['secret'] ?? '');
+        $email = strtolower(trim((string) ($input['email'] ?? $_GET['email'] ?? '')));
+        $password = (string) ($input['password'] ?? $_GET['password'] ?? '');
+        if ($rootSetupSecret === '') {
+            http_response_code(403);
+            echo json_encode(['error' => 'ROOT_SETUP_SECRET nao configurado no servidor.']);
+            break;
+        }
+        if (!hash_equals($rootSetupSecret, $secret)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Segredo invalido.']);
+            break;
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'E-mail invalido.']);
+            break;
+        }
+        if (strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A senha temporaria deve ter pelo menos 6 caracteres.']);
+            break;
+        }
+        $lookup = supabaseRequest(
+            'GET',
+            '/auth/v1/admin/users?email=' . rawurlencode($email),
+            null,
+            null,
+            $supabaseServiceKey
+        );
+        $existing = $lookup['body']['users'][0] ?? null;
+        $authWrite = $existing
+            ? supabaseRequest(
+                'PUT',
+                '/auth/v1/admin/users/' . rawurlencode($existing['id']),
+                ['password' => $password, 'email_confirm' => true],
+                null,
+                $supabaseServiceKey
+            )
+            : supabaseRequest(
+                'POST',
+                '/auth/v1/admin/users',
+                ['email' => $email, 'password' => $password, 'email_confirm' => true],
+                null,
+                $supabaseServiceKey
+            );
+        $userId = $authWrite['body']['id'] ?? ($existing['id'] ?? null);
+        if ($authWrite['status'] < 200 || $authWrite['status'] >= 300 || !$userId) {
+            http_response_code($authWrite['status'] === 0 ? 500 : 400);
+            echo json_encode(['error' => $authWrite['body']['msg'] ?? $authWrite['body']['message'] ?? 'Nao foi possivel criar o acesso.']);
+            break;
+        }
+        $profile = [
+            'id' => $userId,
+            'email' => $email,
+            'role' => 'admin',
+            'status' => 'approved',
+            'password_change_required' => true,
+            'password_reset_offered' => false
+        ];
+        $profileWrite = supabaseRequest(
+            'POST',
+            '/rest/v1/profiles?on_conflict=id',
+            $profile,
+            null,
+            $supabaseServiceKey,
+            ['Prefer: resolution=merge-duplicates,return=minimal']
+        );
+        if ($profileWrite['status'] < 200 || $profileWrite['status'] >= 300) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Acesso criado, mas nao foi possivel configurar o perfil admin.']);
+            break;
+        }
+        echo json_encode(['ok' => true, 'email' => $email, 'role' => 'admin', 'password_change_required' => true]);
+        break;
+
     case 'deleteUser':
         $input = jsonInput();
         if (!requireSupabaseAdmin()) break;

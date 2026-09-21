@@ -35,6 +35,7 @@ $localConfig = loadJsonConfig(__DIR__ . '/config.local.json');
 $supabaseUrl = rtrim((string) configValue($localConfig, ['SUPABASE_URL'], 'https://fwldefyksaltfvdhwdfi.supabase.co'), '/');
 $supabasePublishableKey = (string) configValue($localConfig, ['SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY'], 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
 $supabaseServiceKey = (string) configValue($localConfig, ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY']);
+$rootSetupSecret = (string) configValue($localConfig, ['ROOT_SETUP_SECRET']);
 
 function jsonInput() {
     return json_decode(file_get_contents('php://input'), true) ?: [];
