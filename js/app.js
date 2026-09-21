@@ -599,9 +599,45 @@ async function handlePasswordRecoveryPromptFallback(){
 
 // Password recovery uses the same typed form as first-access changes.
 async function handlePasswordRecovery(){
-  const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
-  const token = params.get('access_token');
-  if(params.get('type') !== 'recovery' || !token) return;
+  const hashParams = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  const queryParams = new URLSearchParams(String(location.search || '').replace(/^\?/, ''));
+  const getParam = name => hashParams.get(name) || queryParams.get(name);
+  const type = getParam('type');
+  if(type !== 'recovery') return;
+
+  let token = getParam('access_token');
+  const tokenHash = getParam('token_hash');
+
+  // Some Supabase templates deliver a one-time token_hash instead of an
+  // access token. Exchange it before opening the password form.
+  if(!token && tokenHash){
+    const verifyResponse = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({token_hash: tokenHash, type: 'recovery'})
+    });
+    const verifyPayload = await verifyResponse.json().catch(() => ({}));
+    if(verifyResponse.ok && verifyPayload.access_token){
+      token = verifyPayload.access_token;
+    } else {
+      window.alert(verifyPayload.msg || verifyPayload.message || 'Este link de recuperação expirou. Solicite um novo link.');
+      return;
+    }
+  }
+
+  // PKCE links require a verifier created by the same browser that requested
+  // the reset. This app uses the implicit recovery link, so explain how to
+  // recover instead of silently doing nothing if a PKCE link is received.
+  if(!token){
+    if(getParam('code')){
+      window.alert('Este link de recuperação não pode ser usado nesta tela. Solicite um novo link e abra-o no mesmo navegador.');
+    }
+    return;
+  }
+
   const changed = await openPasswordChangeForm('recovery', token);
   if(changed){
     window.alert('Senha criada com sucesso. Agora faça login.');
