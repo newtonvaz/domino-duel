@@ -118,6 +118,15 @@ async function api(method, body){
         body: body ? JSON.stringify(body) : undefined
       });
       if(!res.ok){
+        // Login/registro precisam devolver ao chamador os detalhes do backend
+        // mesmo quando a resposta é 401/409. O login usa esse retorno para
+        // oferecer a troca de senha somente na primeira tentativa elegível.
+        if(method === 'login' || method === 'register' || method === 'requestPasswordReset'){
+          try{
+            const payload = await res.json();
+            if(payload && typeof payload === 'object') return payload;
+          }catch(e){}
+        }
         lastError = new Error(`HTTP ${res.status} em ${endpoint}`);
         continue;
       }
