@@ -19,6 +19,89 @@ const APP_TIMEZONE = 'America/Recife';
 let data = {players:[], matches:[], settings:{}};
 
 const SUPABASE_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
+let authRefreshTimer = null;
+let authRefreshPromise = null;
+
+function accessTokenExpiresAt(token, expiresIn = null){
+  const duration = Number(expiresIn);
+  if(Number.isFinite(duration) && duration > 0){
+    return Date.now() + duration * 1000;
+  }
+  try{
+    const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
+    const payload = JSON.parse(atob(padded));
+    return Number(payload.exp) * 1000;
+  }catch(e){
+    return 0;
+  }
+}
+
+function scheduleAuthRefresh(expiresIn = null){
+  if(authRefreshTimer) clearTimeout(authRefreshTimer);
+  const token = localStorage.getItem('duelo_access_token');
+  if(!token) return;
+
+  const storedExpiry = Number(localStorage.getItem('duelo_access_token_expires_at'));
+  const expiresAt = storedExpiry > 0 ? storedExpiry : accessTokenExpiresAt(token, expiresIn);
+  if(!(expiresAt > 0)) return;
+  localStorage.setItem('duelo_access_token_expires_at', String(expiresAt));
+
+  // Renew one minute before expiration, while retaining a retry window for
+  // devices that wake up from the background with an already expired timer.
+  const delay = Math.max(10000, expiresAt - Date.now() - 60000);
+  authRefreshTimer = setTimeout(async () => {
+    const refreshed = await refreshAuthToken();
+    if(refreshed) scheduleAuthRefresh();
+  }, delay);
+}
+
+function storeAuthTokens(accessToken, refreshToken = null, expiresIn = null){
+  if(accessToken) localStorage.setItem('duelo_access_token', accessToken);
+  if(refreshToken) localStorage.setItem('duelo_refresh_token', refreshToken);
+  const expiresAt = accessTokenExpiresAt(accessToken, expiresIn);
+  if(expiresAt > 0) localStorage.setItem('duelo_access_token_expires_at', String(expiresAt));
+  scheduleAuthRefresh(expiresIn);
+}
+
+function clearAuthStorage(){
+  if(authRefreshTimer) clearTimeout(authRefreshTimer);
+  authRefreshTimer = null;
+  localStorage.removeItem('duelo_user');
+  localStorage.removeItem('duelo_access_token');
+  localStorage.removeItem('duelo_refresh_token');
+  localStorage.removeItem('duelo_access_token_expires_at');
+}
+
+async function refreshAuthToken(){
+  if(authRefreshPromise) return authRefreshPromise;
+  const refreshToken = localStorage.getItem('duelo_refresh_token');
+  if(!refreshToken || !SUPABASE_ENABLED) return false;
+
+  authRefreshPromise = (async () => {
+    try{
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({refresh_token: refreshToken})
+      });
+      if(!res.ok) return false;
+      const payload = await res.json();
+      if(!payload.access_token) return false;
+      storeAuthTokens(payload.access_token, payload.refresh_token, payload.expires_in);
+      return true;
+    }catch(e){
+      console.warn('Não foi possível renovar a sessão:', e);
+      return false;
+    }finally{
+      authRefreshPromise = null;
+    }
+  })();
+  return authRefreshPromise;
+}
 
 async function supabaseRequest(table, query){
   const params = new URLSearchParams(query || {});
@@ -106,7 +189,8 @@ async function api(method, body){
   const endpoints = [API_URL, API_FALLBACK_URL].filter((url, i, list) => url && list.indexOf(url) === i);
   let lastError = null;
   for(const endpoint of endpoints){
-    try{
+    for(let attempt = 0; attempt < 2; attempt++){
+      try{
       const res = await fetch(`${endpoint}?action=${method}`, {
         method: 'POST',
         headers: {
@@ -118,6 +202,9 @@ async function api(method, body){
         body: body ? JSON.stringify(body) : undefined
       });
       if(!res.ok){
+        if(res.status === 401 && attempt === 0 && method !== 'login' && method !== 'register'){
+          if(await refreshAuthToken()) continue;
+        }
         // Login/registro precisam devolver ao chamador os detalhes do backend
         // mesmo quando a resposta é 401/409. O login usa esse retorno para
         // oferecer a troca de senha somente na primeira tentativa elegível.
@@ -131,8 +218,9 @@ async function api(method, body){
         continue;
       }
       return await res.json();
-    }catch(e){
-      lastError = e;
+      }catch(e){
+        lastError = e;
+      }
     }
   }
   console.warn('API error:', lastError || 'Nenhum endpoint configurado');
@@ -345,9 +433,7 @@ async function checkSession(){
   if(session && session.ok){
     if(session.password_change_required && !(await requestFirstAccessPasswordChange())){
       user = null;
-      localStorage.removeItem('duelo_user');
-      localStorage.removeItem('duelo_access_token');
-      localStorage.removeItem('duelo_refresh_token');
+      clearAuthStorage();
       updateAuthUI();
       return;
     }
@@ -355,9 +441,7 @@ async function checkSession(){
     localStorage.setItem('duelo_user', JSON.stringify(user));
   } else {
     user = null;
-    localStorage.removeItem('duelo_user');
-    localStorage.removeItem('duelo_access_token');
-    localStorage.removeItem('duelo_refresh_token');
+    clearAuthStorage();
   }
   updateAuthUI();
 }
@@ -433,11 +517,9 @@ async function submitLogin(){
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
   const res = await api('login', {email, password: pass});
   if(res && res.ok){
-    if(res.access_token) localStorage.setItem('duelo_access_token', res.access_token);
-    if(res.refresh_token) localStorage.setItem('duelo_refresh_token', res.refresh_token);
+    storeAuthTokens(res.access_token, res.refresh_token, res.expires_in);
     if(res.password_change_required && !(await requestFirstAccessPasswordChange())){
-      localStorage.removeItem('duelo_access_token');
-      localStorage.removeItem('duelo_refresh_token');
+      clearAuthStorage();
       openAdminModal();
       err.textContent = 'A troca de senha é obrigatória para continuar.';
       shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
@@ -641,9 +723,7 @@ function logout(){
   stopPolling();
   api('logout');
   user = null;
-  localStorage.removeItem('duelo_user');
-  localStorage.removeItem('duelo_access_token');
-  localStorage.removeItem('duelo_refresh_token');
+  clearAuthStorage();
   try { closeAdminModal(); } catch(e) {}
   location.reload();
 }
@@ -1580,6 +1660,7 @@ function renderRanking(){
 (async function init(){
   loadLocal();
   modoBuchuda = localStorage.getItem('modo_buchuda') === '1';
+  scheduleAuthRefresh();
   await handlePasswordRecovery();
   await checkSession();
   updateBuchudaUI();
