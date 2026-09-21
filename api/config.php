@@ -22,10 +22,19 @@ function loadJsonConfig($path) {
     return is_array($config) ? $config : [];
 }
 
+function configValue($localConfig, $keys, $fallback = '') {
+    foreach ($keys as $key) {
+        $environmentValue = getenv($key);
+        if ($environmentValue !== false && $environmentValue !== '') return $environmentValue;
+        if (isset($localConfig[$key]) && $localConfig[$key] !== '') return $localConfig[$key];
+    }
+    return $fallback;
+}
+
 $localConfig = loadJsonConfig(__DIR__ . '/config.local.json');
-$supabaseUrl = rtrim((string) ($localConfig['SUPABASE_URL'] ?? getenv('SUPABASE_URL') ?: 'https://fwldefyksaltfvdhwdfi.supabase.co'), '/');
-$supabasePublishableKey = (string) ($localConfig['SUPABASE_PUBLISHABLE_KEY'] ?? $localConfig['SUPABASE_ANON_KEY'] ?? getenv('SUPABASE_PUBLISHABLE_KEY') ?: getenv('SUPABASE_ANON_KEY') ?: 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
-$supabaseServiceKey = (string) ($localConfig['SUPABASE_SERVICE_ROLE_KEY'] ?? $localConfig['SUPABASE_SECRET_KEY'] ?? getenv('SUPABASE_SERVICE_ROLE_KEY') ?: getenv('SUPABASE_SECRET_KEY') ?: '');
+$supabaseUrl = rtrim((string) configValue($localConfig, ['SUPABASE_URL'], 'https://fwldefyksaltfvdhwdfi.supabase.co'), '/');
+$supabasePublishableKey = (string) configValue($localConfig, ['SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY'], 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
+$supabaseServiceKey = (string) configValue($localConfig, ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY']);
 
 function jsonInput() {
     return json_decode(file_get_contents('php://input'), true) ?: [];
