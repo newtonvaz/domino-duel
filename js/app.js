@@ -1,20 +1,156 @@
-/* ---------- API (MySQL) ---------- */
-const API_URL = window.location.protocol.startsWith('http') ? 'api/index.php' : 'https://dominoduelpro.freedev.app/api/index.php';
+/* ---------- DATA SOURCES (Supabase + fallbacks) ---------- */
+const LOCAL_API_URL = 'http://127.0.0.1:8765/api/index.php';
+// O anon/publishable key pode aparecer no frontend; nunca use a service_role key.
+// Estes valores mantêm compatibilidade com o projeto Supabase usado originalmente.
+const SUPABASE_URL = String(window.__SUPABASE_URL || 'https://wwwntppaulmtmkmmezzt.supabase.co').replace(/\/+$/, '');
+const SUPABASE_ANON_KEY = String(window.__SUPABASE_ANON_KEY || 'sb_publishable_lrXwCVybnHQSMHWH01lANg_S6OtDEtY');
+const SUPABASE_SETTINGS_TABLE = String(window.__SUPABASE_SETTINGS_TABLE || 'settings');
+const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+const IS_NETLIFY_HOST = /(^|\.)netlify\.app$/i.test(window.location.hostname);
+const PUBLISHED_DATA_URL = window.__APP_DATA_URL || (IS_NETLIFY_HOST
+  ? new URL('data/backup.json', window.location.href).href
+  : null);
+const PUBLISHED_SETTINGS_URL = window.__APP_SETTINGS_URL || (IS_NETLIFY_HOST
+  ? new URL('data/settings.json', window.location.href).href
+  : null);
+const API_URL = window.__APP_API_URL || (window.location.protocol === 'file:'
+  ? LOCAL_API_URL
+  : new URL('api/index.php', window.location.href).href);
+// O fallback local é útil no desenvolvimento HTTP, mas nunca deve ser usado
+// por um site publicado: o navegador tentaria acessar o computador do usuário.
+const API_FALLBACK_URL = window.location.protocol === 'file:' || IS_NETLIFY_HOST
+  ? null
+  : LOCAL_API_URL;
+const PUBLISHED_READ_ONLY = (IS_NETLIFY_HOST || !!window.__APP_DATA_URL) && !window.__APP_API_URL;
 const STORAGE_KEY = 'duelo_domino_data_v1';
+const APP_TIMEZONE = 'America/Recife';
 let data = {players:[], matches:[], settings:{}};
+let publishedDataPromise = null;
+
+const SUPABASE_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
+const PUBLISHED_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
+
+async function supabaseRequest(table, query){
+  const params = new URLSearchParams(query || {});
+  const url = `${SUPABASE_URL}/rest/v1/${table}${params.toString() ? `?${params}` : ''}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Accept: 'application/json'
+    }
+  });
+  if(!res.ok){
+    let detail = '';
+    try { detail = (await res.json()).message || ''; } catch(e) {}
+    throw new Error(`Supabase ${table}: HTTP ${res.status}${detail ? ` — ${detail}` : ''}`);
+  }
+  return await res.json();
+}
+
+async function supabaseRead(action){
+  if(!SUPABASE_ENABLED) return null;
+  if(action === 'listPlayers'){
+    return await supabaseRequest('players', {
+      select: 'id,name,photo',
+      order: 'name.asc'
+    });
+  }
+  if(action === 'listMatches'){
+    return await supabaseRequest('matches', {
+      select: 'id,date,team_a,team_b,score_a,score_b,winner,buchuda,buchuda_de_re,duration_sec',
+      order: 'date.desc,id.desc'
+    });
+  }
+  if(action === 'listSettings'){
+    const rows = await supabaseRequest(SUPABASE_SETTINGS_TABLE, {
+      select: 'key,value'
+    });
+    return rows.reduce((settings, row) => {
+      settings[row.key] = row.value;
+      return settings;
+    }, {});
+  }
+  return null;
+}
+
+async function publishedData(){
+  if(!PUBLISHED_DATA_URL) return null;
+  if(!publishedDataPromise){
+    const request = (async () => {
+      const [dataRes, settingsRes] = await Promise.all([
+        fetch(PUBLISHED_DATA_URL, {cache: 'no-store'}),
+        PUBLISHED_SETTINGS_URL
+          ? fetch(PUBLISHED_SETTINGS_URL, {cache: 'no-store'})
+          : Promise.resolve(null)
+      ]);
+      if(!dataRes.ok) throw new Error(`Dados publicados indisponíveis (HTTP ${dataRes.status})`);
+      const backup = await dataRes.json();
+      let settings = {};
+      if(settingsRes && settingsRes.ok){
+        try { settings = await settingsRes.json(); } catch(e) {}
+      }
+      return {backup: backup && typeof backup === 'object' ? backup : {}, settings};
+    })();
+    publishedDataPromise = request.finally(() => {
+      publishedDataPromise = null;
+    });
+  }
+  return publishedDataPromise;
+}
+
+async function publishedRead(action){
+  if(!IS_NETLIFY_HOST && !window.__APP_DATA_URL) return null;
+  const published = await publishedData();
+  if(!published) return null;
+  if(action === 'listPlayers') return Array.isArray(published.backup.players) ? published.backup.players : [];
+  if(action === 'listMatches') return Array.isArray(published.backup.matches) ? published.backup.matches : [];
+  if(action === 'listSettings') return published.settings && typeof published.settings === 'object'
+    ? published.settings
+    : {};
+  return null;
+}
 
 async function api(method, body){
-  try{
-    const res = await fetch(`${API_URL}?action=${method}`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: body ? JSON.stringify(body) : undefined
-    });
-    return await res.json();
-  }catch(e){
-    console.warn('API error:', e);
-    return null;
+  if(SUPABASE_READ_ACTIONS.has(method) && SUPABASE_ENABLED){
+    try{
+      const supabase = await supabaseRead(method);
+      if(supabase !== null) return supabase;
+    }catch(e){
+      console.warn('Leitura Supabase indisponível; tentando fallback:', e);
+    }
   }
+  if(PUBLISHED_READ_ACTIONS.has(method) && (IS_NETLIFY_HOST || window.__APP_DATA_URL)){
+    try{
+      const published = await publishedRead(method);
+      if(published !== null) return published;
+    }catch(e){
+      console.warn('Dados publicados indisponíveis:', e);
+    }
+  }
+  if(PUBLISHED_READ_ONLY) return null;
+  const endpoints = [API_URL, API_FALLBACK_URL].filter((url, i, list) => url && list.indexOf(url) === i);
+  let lastError = null;
+  for(const endpoint of endpoints){
+    try{
+      const res = await fetch(`${endpoint}?action=${method}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if(!res.ok){
+        lastError = new Error(`HTTP ${res.status} em ${endpoint}`);
+        continue;
+      }
+      return await res.json();
+    }catch(e){
+      lastError = e;
+    }
+  }
+  console.warn('API error:', lastError || 'Nenhum endpoint configurado');
+  return null;
 }
 
 function loadLocal(){
@@ -44,14 +180,18 @@ function updateSyncUI() {
   }
 }
 
-async function saveData(){
+async function saveData(snapshot){
   try {
+    const playersToSave = snapshot?.players || data.players;
+    const matchesToSave = snapshot?.matches || data.matches;
     saveLocal();
-    const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
-    const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
-    
-    if (playersRes?.success !== false && matchesRes?.success !== false) {
-      await api('saveBackup', {players: data.players, matches: data.matches});
+    const playersRes = await api('savePlayers', {players: playersToSave.filter(p => p.id)});
+    const matchesRes = await api('saveMatches', {matches: matchesToSave.filter(m => m.id)});
+
+    const playersSaved = playersRes && (playersRes.success === true || playersRes.ok === true);
+    const matchesSaved = matchesRes && (matchesRes.success === true || matchesRes.ok === true);
+    if (playersSaved && matchesSaved) {
+      await api('saveBackup', {players: playersToSave, matches: matchesToSave});
       clearSyncNeeded();
       return true;
     } else {
@@ -95,6 +235,9 @@ let editingPlayerId = null;
 let rankingPeriod = 'week';
 let periodOffset = 0;
 let pollTimer = null;
+let refreshPromise = null;
+const POLL_INTERVAL_MS = 30000;
+const APP_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
 /* ---------- HELPERS ---------- */
 function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4); }
@@ -127,18 +270,50 @@ function pipsHTML(n, small){
 }
 function fmtDate(iso){
   if(!iso) return '--';
-  const d = new Date(iso + (iso.length <= 10 ? 'T12:00:00' : ''));
-  return d.toLocaleDateString('pt-BR');
+  const [year, month, day] = String(iso).slice(0,10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '--';
 }
 function fmtDuration(sec){
   if(!sec && sec !== 0) return '--';
   const m = Math.floor(sec/60), s = sec%60;
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
+function recifeDateInputValue(date){
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIMEZONE, year:'numeric', month:'2-digit', day:'2-digit'
+  }).formatToParts(date || new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+function recifeCalendarNow(){
+  const [year, month, day] = recifeDateInputValue().split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+function matchDateObject(match){
+  const [year, month, day] = matchDate(match).split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+function matchDateFromUser(value){
+  const date = String(value || '').slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return recifeDateInputValue();
+}
 
-/* ---------- LOGO ---------- */
-document.getElementById('logoTile').innerHTML =
-  Array.from({length:9},(_,i)=>`<span style="background:${[1,3,4,6,7,9].includes(i+1)?'#1a1f2b':'transparent'}"></span>`).join('');
+/* Regra oficial de ordenação: DATA DA PARTIDA (ignorando hora) → ID do registro (inserção mais recente primeiro). */
+function matchDate(m){ return m && m.date ? String(m.date).slice(0,10) : ''; }
+function compareMatchDesc(a,b){
+  const da = matchDate(a), db = matchDate(b);
+  if(da !== db) return da > db ? -1 : 1;
+  return a.id > b.id ? -1 : a.id < b.id ? 1 : 0;
+}
+function nextMatchId(){
+  let max = 0;
+  (data.matches||[]).forEach(m=>{
+    const mm = /^m_z(\d+)$/.exec(String(m.id||''));
+    if(mm) max = Math.max(max, parseInt(mm[1],10));
+  });
+  return 'm_z' + String(max+1).padStart(6,'0');
+}
 
 /* ---------- PASSWORD TOGGLE ---------- */
 function togglePw(btn){
@@ -162,7 +337,8 @@ function showView(id){
   if(id==='match' && !user) return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===id));
+  const selectedNav = (id === 'ranking' || id === 'players') ? 'more' : id;
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===selectedNav));
   if(id==='home') renderHome();
   if(id==='players') renderPlayers();
   if(id==='match') renderMatchSetup();
@@ -184,7 +360,6 @@ function updateAuthUI(){
     document.body.classList.add('is-' + user.role);
   }
   document.getElementById('adminBtnLabel').textContent = user ? 'Sair' : 'Login';
-  document.getElementById('adminToggleBtn').firstChild.textContent = user ? '\u{1F513} ' : '\u{1F512} ';
 }
 
 document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
@@ -321,49 +496,58 @@ function logout(){
 }
 
 async function refreshFromServer(){
-  const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
-    api('listPlayers'), api('listMatches'), api('listSettings')
-  ]);
-  if(playersRemote && Array.isArray(playersRemote)){
-    data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
-  }
-  if(matchesRemote && Array.isArray(matchesRemote)){
-    data.matches = matchesRemote.map(m => ({
-      id: m.id, date: m.date,
-      teamA: m.team_a || m.teamA,
-      teamB: m.team_b || m.teamB,
-      scoreA: m.score_a ?? m.scoreA,
-      scoreB: m.score_b ?? m.scoreB,
-      winner: m.winner,
-      buchuda: m.buchuda,
-      buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
-      durationSec: m.duration_sec ?? m.durationSec
-    }));
-  }
-  if(settingsRemote && settingsRemote.modo_buchuda !== undefined){
-    modoBuchuda = settingsRemote.modo_buchuda;
-    localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
-    updateBuchudaUI();
-    updateHistoryTabs();
-  }
-  const activeView = document.querySelector('.view.active');
-  if(activeView){
-    switch(activeView.id.replace('view-','')){
-      case 'home': renderHome(); break;
-      case 'players': renderPlayers(); break;
-      case 'history': renderHistory(); break;
-      case 'ranking': renderRanking(); break;
+  if(refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    const [playersRemote, matchesRemote, settingsRemote] = await Promise.all([
+      api('listPlayers'), api('listMatches'), api('listSettings')
+    ]);
+    if(playersRemote && Array.isArray(playersRemote)){
+      data.players = playersRemote.map(p => ({id:p.id, name:p.name, photo:p.photo}));
     }
+    if(matchesRemote && Array.isArray(matchesRemote)){
+      data.matches = matchesRemote.map(m => ({
+        id: m.id, date: m.date,
+        teamA: m.team_a || m.teamA,
+        teamB: m.team_b || m.teamB,
+        scoreA: m.score_a ?? m.scoreA,
+        scoreB: m.score_b ?? m.scoreB,
+        winner: m.winner,
+        buchuda: m.buchuda,
+        buchudaDeRe: m.buchuda_de_re ?? m.buchudaDeRe,
+        durationSec: m.duration_sec ?? m.durationSec
+      }));
+    }
+    if(settingsRemote && settingsRemote.modo_buchuda !== undefined){
+      modoBuchuda = settingsRemote.modo_buchuda;
+      localStorage.setItem('modo_buchuda', modoBuchuda ? '1' : '0');
+      updateBuchudaUI();
+      updateHistoryTabs();
+    }
+    const activeView = document.querySelector('.view.active');
+    if(activeView){
+      switch(activeView.id.replace('view-','')){
+        case 'home': renderHome(); break;
+        case 'players': renderPlayers(); break;
+        case 'history': renderHistory(); break;
+        case 'ranking': renderRanking(); break;
+      }
+    }
+  })();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
   }
 }
 
 function startPolling(){
   stopPolling();
   pollTimer = setInterval(async () => {
+    if(document.hidden) return;
     await refreshFromServer();
     renderPendingUsers();
     if (isSyncNeeded()) retrySync();
-  }, 5000);
+  }, POLL_INTERVAL_MS);
 }
 
 function stopPolling(){
@@ -375,19 +559,19 @@ function renderHome(){
   document.getElementById('homeTotalMatches').textContent = data.matches.length;
   document.getElementById('statPlayers').textContent = data.players.length;
   document.getElementById('statBuchudas').textContent = data.matches.filter(m=>m.buchuda).length;
-  document.getElementById('statRe').textContent = data.matches.filter(m=>m.buchudaDeRe).length;
 
   const wrap = document.getElementById('recentMatchesCard');
-  const recent = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
+  const recent = [...data.matches].sort(compareMatchDesc).slice(0,5);
   if(recent.length===0){
     wrap.innerHTML = `<div class="empty-state" style="padding:16px 6px;"><p>Nenhuma partida registrada ainda.</p></div>`;
+    renderPendingUsers();
     return;
   }
   wrap.innerHTML = recent.map(m=>{
     const teamAName = `${playerName(m.teamA[0])} &amp; ${playerName(m.teamA[1])}`;
     const teamBName = `${playerName(m.teamB[0])} &amp; ${playerName(m.teamB[1])}`;
     return `<div class="recent-item">
-      <span class="teams">${m.winner==='A'?'\u{0001f451} ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'\u{0001f451} ':''}${teamBName}</span>
+      <span class="teams">${m.winner==='A'?'<span class="winner-mark" aria-label="Vencedor"></span> ':''}${teamAName} <span style="color:var(--text-muted)">vs</span> ${m.winner==='B'?'<span class="winner-mark" aria-label="Vencedor"></span> ':''}${teamBName}</span>
       <span class="score">${m.scoreA}x${m.scoreB}</span>
     </div>`;
   }).join('');
@@ -532,7 +716,7 @@ function renderMatchSetup(){
     return;
   }
 
-  const today = new Date().toISOString().slice(0,10);
+  const today = recifeDateInputValue();
   const dateInput = document.getElementById('matchDate');
   if(dateInput){
     dateInput.max = today;
@@ -601,7 +785,7 @@ function startMatch(){
     startTime: Date.now(),
     finished:false,
     result:null,
-    selectedDate: dateInput ? dateInput.value || new Date().toISOString().slice(0,10) : new Date().toISOString().slice(0,10)
+    selectedDate: dateInput ? dateInput.value || recifeDateInputValue() : recifeDateInputValue()
   };
   renderMatchSetup();
 }
@@ -622,10 +806,10 @@ function renderLiveMatch(){
     const buchudaDeRePossible = loserScore === 5;
     resultHTML = `
       <div class="result-panel">
-        <div class="win-tag">\u{0001f451} ${winName} venceu!</div>
+        <div class="win-tag"><span class="winner-mark" aria-hidden="true"></span>${winName} venceu!</div>
         <div class="badges">
-          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">\u{0001f0e2} Buchuda${bActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\u{0001f0e2} Buchuda</span>`}
-          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">\u{0001f0e2} Buchuda de r\u00e9${reActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">\u{0001f0e2} Buchuda de r\u00e9</span>`}
+          ${isShutout ? `<span class="badge ${bActive?'buchuda':'toggle-off'}" onclick="toggleResultFlag('buchuda')" style="cursor:pointer;">Buchuda${bActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">Buchuda</span>`}
+          ${buchudaDeRePossible ? `<span class="badge ${reActive?'re':'toggle-off'}" onclick="toggleResultFlag('buchudaDeRe')" style="cursor:pointer;">Buchuda de r\u00e9${reActive?' \u2713':''}</span>` : `<span class="badge toggle-off" style="opacity:.3;">Buchuda de r\u00e9</span>`}
         </div>
         <p class="subtle" style="text-align:center;margin:4px 0 12px;">Clique nos selos acima para marcar/desmarcar</p>
         <div class="btn-row">
@@ -634,6 +818,14 @@ function renderLiveMatch(){
         </div>
       </div>`;
   }
+
+  const roundRows = matchState.history.slice(1).reverse().map((score, index) => {
+    const round = matchState.history.length - 1 - index;
+    const previous = matchState.history[matchState.history.length - 2 - index] || [0,0];
+    const scoringTeam = score[0] > previous[0] ? 'A' : 'B';
+    const points = Math.abs(score[scoringTeam === 'A' ? 0 : 1] - previous[scoringTeam === 'A' ? 0 : 1]);
+    return `<div class="round-history-item"><span class="round-domino" aria-hidden="true"></span><div><b>Rodada ${round}</b><small>Dupla ${scoringTeam} fez ${points} ponto${points!==1?'s':''}</small></div><strong>${score[0]} <i>×</i> ${score[1]}</strong></div>`;
+  }).join('') || '<div class="round-history-empty">Nenhuma rodada registrada ainda.</div>';
 
   wrap.innerHTML = `
     <div class="placar-overlay">
@@ -662,12 +854,18 @@ function renderLiveMatch(){
       ${resultHTML}
     </div>
     <div class="normal-controls">
+      <div class="live-heading"><div><span>REGISTRE CADA JOGADA</span><h2>Placar da partida</h2></div><button class="btn btn-placar live-display" onclick="togglePlacarMode()">Modo placar</button></div>
+      <div class="quick-score-actions">
+        <button class="quick-score a" onclick="adjustScore('A',1)"><span>+</span><small>Adicionar ponto</small><b>Dupla A</b></button>
+        <button class="quick-score b" onclick="adjustScore('B',1)"><span>+</span><small>Adicionar ponto</small><b>Dupla B</b></button>
+      </div>
       <div class="btn-row">
-        <button class="btn btn-secondary" onclick="undoPoint()">&#x21ba; Desfazer</button>
+        <button class="btn btn-secondary" onclick="undoPoint()">Desfazer última rodada</button>
         <button class="btn btn-danger" onclick="cancelMatch()">Cancelar Partida</button>
       </div>
-      <div class="btn-row" style="margin-top:12px;">
-        <button class="btn btn-placar" onclick="togglePlacarMode()">Modo Placar</button>
+      <div class="round-history-card">
+        <div class="round-history-title"><span class="round-domino" aria-hidden="true"></span><div><b>Rodadas da partida</b><small>PLACAR ACUMULADO</small></div></div>
+        <div class="round-history-list">${roundRows}</div>
       </div>
     </div>
   `;
@@ -845,9 +1043,9 @@ async function saveMatch(){
   const r = matchState.result;
   const btn = document.querySelector('#liveMatchWrap .btn-primary');
   btn.disabled = true; btn.textContent = 'Salvando...';
-  data.matches.push({
-    id: uid('m'),
-    date: matchState.selectedDate || new Date().toISOString().slice(0,10),
+  const match = {
+    id: nextMatchId(),
+    date: matchDateFromUser(matchState.selectedDate),
     teamA: matchState.teamA,
     teamB: matchState.teamB,
     scoreA: matchState.scoreA,
@@ -856,8 +1054,10 @@ async function saveMatch(){
     buchuda: !!matchState._buchuda,
     buchudaDeRe: !!matchState._buchudaDeRe,
     durationSec: Math.round((Date.now()-matchState.startTime)/1000)
-  });
-  await saveData();
+  };
+  const saveSnapshot = {players: [...data.players], matches: [...data.matches, match]};
+  data.matches = saveSnapshot.matches;
+  await saveData(saveSnapshot);
   exitPlacarMode();
   matchState = null;
   showView('history');
@@ -883,7 +1083,8 @@ function updateBuchudaUI(){
   const ball = document.getElementById('buchudaBall');
   const banner = document.getElementById('buchudaBanner');
   if(!ball || !banner) return;
-  ball.style.background = modoBuchuda ? '#d1495b' : 'var(--text-muted)';
+  document.body.classList.toggle('buchuda-active', modoBuchuda);
+  ball.style.background = '';
   ball.style.display = '';
   banner.style.display = modoBuchuda ? 'block' : 'none';
 }
@@ -911,7 +1112,7 @@ function setHistoryFilter(filter){
 function renderHistory(skipReRender){
   if(!skipReRender && document.querySelector('.date-edit:focus')) return;
   const list = document.getElementById('historyList');
-  let matches = [...data.matches].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let matches = [...data.matches].sort(compareMatchDesc);
   if(modoBuchuda) {
     matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
   }
@@ -929,7 +1130,7 @@ function renderHistory(skipReRender){
     const teamBName = `${playerName(m.teamB[0])} &amp; ${playerName(m.teamB[1])}`;
     const dateStr = m.date ? m.date.slice(0,10) : '';
     const dateHtml = user && user.role === 'admin'
-      ? `<input type="date" class="date-edit" value="${dateStr}" data-match-id="${m.id}" onchange="updateMatchDate(this)" max="${new Date().toISOString().slice(0,10)}">`
+      ? `<input type="date" class="date-edit" value="${dateStr}" data-match-id="${m.id}" onchange="updateMatchDate(this)" max="${recifeDateInputValue()}">`
       : `<span>${fmtDate(m.date)}</span>`;
     return `<div class="hist-card">
       <div class="date-row">
@@ -939,9 +1140,9 @@ function renderHistory(skipReRender){
         </span>
       </div>
       <div class="match-row">
-        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'\u{0001f451} ':''}${teamAName}</div>
+        <div class="side ${m.winner==='A'?'winner':''}">${m.winner==='A'?'<span class="winner-mark" aria-label="Vencedor"></span> ':''}${teamAName}</div>
         <div class="mid-score">${m.scoreA} x ${m.scoreB}</div>
-        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' \u{0001f451}':''}</div>
+        <div class="side right ${m.winner==='B'?'winner':''}">${teamBName}${m.winner==='B'?' <span class="winner-mark" aria-label="Vencedor"></span>':''}</div>
       </div>
       ${(m.buchuda || m.buchudaDeRe) ? `<div class="badges">
         ${m.buchuda?'<span class="badge buchuda">\u{0001f0e2} Buchuda</span>':''}
@@ -955,7 +1156,7 @@ async function updateMatchDate(input){
   const id = input.dataset.matchId;
   const match = data.matches.find(m => m.id === id);
   if(!match || !input.value) return;
-  const today = new Date().toISOString().slice(0,10);
+  const today = recifeDateInputValue();
   if(input.value > today) return;
   match.date = input.value;
   await saveData();
@@ -970,8 +1171,10 @@ async function deleteMatch(id){
   const teamBName = `${playerName(match.teamB[0])} & ${playerName(match.teamB[1])}`;
   if(!confirm(`Remover este duelo?\n${teamAName} ${match.scoreA}x${match.scoreB} ${teamBName}`)) return;
   data.matches = data.matches.filter(m=>m.id!==id);
-  await saveData();
+  saveLocal();
   renderHistory();
+  const res = await api('deleteMatch', {id});
+  if(!res || res.ok !== true) markSyncNeeded();
 }
 
 /* ---------- RANKING ---------- */
@@ -998,14 +1201,14 @@ function shiftPeriod(dir){
 }
 
 function getWeekRange(offset){
-  const now = new Date();
+  const now = recifeCalendarNow();
   const day = (now.getDay()+6)%7;
   const monday = new Date(now); monday.setHours(0,0,0,0); monday.setDate(now.getDate()-day+offset*7);
   const sunday = new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59,999);
   return [monday, sunday];
 }
 function getMonthRange(offset){
-  const now = new Date();
+  const now = recifeCalendarNow();
   const first = new Date(now.getFullYear(), now.getMonth()+offset, 1, 0,0,0,0);
   const last = new Date(now.getFullYear(), now.getMonth()+offset+1, 0, 23,59,59,999);
   return [first, last];
@@ -1018,6 +1221,18 @@ function periodLabelText(range){
   return range[0].toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
 }
 
+/* Diferença de buchudas: feitas - sofridas (exibida no lado direito do ranking). */
+function buchudaNetHtml(r){
+  const f = Number(r.buchudasFeitas)||0;
+  const s = Number(r.buchudasSofridas)||0;
+  if(!f && !s) return '';
+  const d = f - s;
+  const sign = d>0 ? '+' : d<0 ? '-' : '';
+  const color = d>0 ? 'var(--green)' : d<0 ? 'var(--red)' : 'var(--text-muted)';
+  const val = d === 0 ? '0' : Math.abs(d);
+  return `<span style="color:${color};font-weight:700;">${sign}${val}</span>`;
+}
+
 function renderRanking(){
   const navEl = document.getElementById('periodNav');
   let matches = data.matches;
@@ -1026,7 +1241,7 @@ function renderRanking(){
     navEl.style.display = 'flex';
     document.getElementById('periodLabel').textContent = periodLabelText(range);
     matches = data.matches.filter(m=>{
-      const d = new Date(m.date);
+      const d = matchDateObject(m);
       return d >= range[0] && d <= range[1];
     });
   } else {
@@ -1036,13 +1251,27 @@ function renderRanking(){
   if(modoBuchuda) matches = matches.filter(m => m.buchuda || m.buchudaDeRe);
 
   const list = document.getElementById('rankingList');
+  const summary = document.getElementById('rankingSummary');
+  if(summary){
+    const participantIds = new Set();
+    matches.forEach(m => {
+      (m.teamA || []).forEach(id => participantIds.add(id));
+      (m.teamB || []).forEach(id => participantIds.add(id));
+    });
+    const participants = participantIds.size;
+    const buchudas = matches.filter(m => m.buchuda).length;
+    summary.innerHTML = `
+      <div class="stat-box"><div class="num">${matches.length}</div><div class="lbl">Partidas</div></div>
+      <div class="stat-box"><div class="num">${participants}</div><div class="lbl">Jogadores</div></div>
+      <div class="stat-box"><div class="num">${buchudas}</div><div class="lbl">Buchudas</div></div>`;
+  }
   if(matches.length===0){
     const msg = modoBuchuda ? 'Nenhuma partida com buchuda neste per\u00edodo.' : 'Nenhuma partida registrada neste per\u00edodo.';
     list.innerHTML = `<div class="empty-state"><div class="big-emoji">\u{0001f3c6}</div><p>${msg}</p></div>`;
     return;
   }
 
-  function renderRankRow(r, i, avatarLeft, nameHtml, statsHtml){
+  function renderRankRow(r, i, avatarLeft, nameHtml, statsHtml, rightHtml){
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
       ${avatarLeft}
@@ -1050,6 +1279,7 @@ function renderRanking(){
         <div class="name">${nameHtml}</div>
         <div class="sub">${statsHtml}</div>
       </div>
+      ${rightHtml || ''}
     </div>`;
   }
 
@@ -1074,21 +1304,25 @@ function renderRanking(){
     const sortFn = modoBuchuda
       ? (a,b) => b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe || a.buchudasSofridas - b.buchudasSofridas
       : (a,b) => b.vitorias - a.vitorias || (a.saldo||0) - (b.saldo||0) || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe;
-    const rows = Object.values(indStats).map(s=>({...s, saldo:s.pontosPro-s.pontosContra}))
+    let rows = Object.values(indStats).map(s=>({...s, saldo:s.pontosPro-s.pontosContra}))
       .sort(sortFn);
+    if(modoBuchuda) rows = rows.filter(r => r.buchudasFeitas>0 || r.buchudasSofridas>0 || r.buchudaDeRe>0);
     list.innerHTML = rows.map((r,i)=>{
       const p = playerById(r.id);
       const name = p ? p.name : 'Jogador removido';
       const extras = [];
-      if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''}`);
-      if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} de r\u00e9`);
+      if(r.buchudasFeitas) extras.push(`${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''}`);
+      if(r.buchudaDeRe) extras.push(`${r.buchudaDeRe} de r\u00e9`);
       if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
       if(modoBuchuda){
         const statsHtml = extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''));
-        return renderRankRow(r, i, avatarHTML(p, 30), escapeHtml(name), statsHtml);
+        const net = buchudaNetHtml(r);
+        const rightHtml = net ? `<div class="wl" title="Buchudas feitas \u2212 sofridas">${net}</div>` : '';
+        return renderRankRow(r, i, avatarHTML(p, 30), escapeHtml(name), statsHtml, rightHtml);
       }
       const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
       const statsHtml = `${extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''))}`;
+      const net = buchudaNetHtml(r);
       return `<div class="rank-row">
         <div class="pos">${i+1}</div>
         ${avatarHTML(p, 30)}
@@ -1096,7 +1330,10 @@ function renderRanking(){
           <div class="name">${escapeHtml(name)}</div>
           <div class="sub">${statsHtml}</div>
         </div>
-        <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
+        <div class="wl">
+        <div class="wl-row"><b>${r.vitorias}V</b> \u00b7 <span class="loss">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo}</div>
+        <div class="wl-row">Aproveitamento <b>${winPct}%</b>${net ? ` \u00b7 ${net}` : ''}</div>
+      </div>
       </div>`;
     }).join('');
     return;
@@ -1127,11 +1364,12 @@ function renderRanking(){
   const sortFn = modoBuchuda
     ? (a,b) => b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe || a.buchudasSofridas - b.buchudasSofridas
     : (a,b) => b.vitorias - a.vitorias || (a.saldo||0) - (b.saldo||0) || b.buchudasFeitas - a.buchudasFeitas || b.buchudaDeRe - a.buchudaDeRe;
-  const rows = Object.keys(stats).map(key=>{
+  let rows = Object.keys(stats).map(key=>{
     const s = stats[key];
     s.saldo = s.pontosPro - s.pontosContra;
     return {key, ...s};
   }).sort(sortFn);
+  if(modoBuchuda) rows = rows.filter(r => r.buchudasFeitas>0 || r.buchudasSofridas>0 || r.buchudaDeRe>0);
 
   list.innerHTML = rows.map((r,i)=>{
     const p1 = playerById(r.ids[0]);
@@ -1139,27 +1377,37 @@ function renderRanking(){
     const name1 = p1 ? p1.name : 'Jogador removido';
     const name2 = p2 ? p2.name : 'Jogador removido';
     const extras = [];
-    if(r.buchudasFeitas) extras.push(`\u{0001f0e2} ${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
-    if(r.buchudaDeRe) extras.push(`\u{0001f0e2} ${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
+    if(r.buchudasFeitas) extras.push(`${r.buchudasFeitas} buchuda${r.buchudasFeitas>1?'s':''} feita${r.buchudasFeitas>1?'s':''}`);
+    if(r.buchudaDeRe) extras.push(`${r.buchudaDeRe} buchuda${r.buchudaDeRe>1?'s':''} de r\u00e9`);
     if(r.buchudasSofridas) extras.push(`\u{0001f62c} ${r.buchudasSofridas} sofrida${r.buchudasSofridas>1?'s':''}`);
     if(modoBuchuda){
       const statsHtml = extras.join(' \u00b7 ');
       const avatarLeft = `<div style="display:flex;align-items:center;gap:6px;">${avatarHTML(p1, 30)}<span style="font-size:11px;color:var(--text-muted);">&amp;</span>${avatarHTML(p2, 30)}</div>`;
       const nameHtml = `${escapeHtml(name1)} &amp; ${escapeHtml(name2)}`;
-      return renderRankRow(r, i, avatarLeft, nameHtml, statsHtml);
+      const net = buchudaNetHtml(r);
+      const rightHtml = net ? `<div class="wl" title="Buchudas feitas \u2212 sofridas">${net}</div>` : '';
+      return renderRankRow(r, i, avatarLeft, nameHtml, statsHtml, rightHtml);
     }
     const winPct = r.jogos ? Math.round((r.vitorias/r.jogos)*100) : 0;
     const statsHtml = extras.join(' \u00b7 ') || (r.jogos+' jogo'+(r.jogos>1?'s':''));
+    const net = buchudaNetHtml(r);
     return `<div class="rank-row">
       <div class="pos">${i+1}</div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        ${avatarHTML(p1, 30)}<span style="font-size:11px;color:var(--text-muted);">&amp;</span>${avatarHTML(p2, 30)}
-      </div>
       <div class="rinfo">
-        <div class="name" style="font-size:13px;">${escapeHtml(name1)} &amp; ${escapeHtml(name2)}</div>
-        <div class="sub">${statsHtml}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${avatarHTML(p1, 26)}
+          <span style="font-weight:700;font-size:13px;color:var(--ivory);">${escapeHtml(name1)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          ${avatarHTML(p2, 26)}
+          <span style="font-weight:700;font-size:13px;color:var(--ivory);">${escapeHtml(name2)}</span>
+        </div>
+        <div class="sub" style="margin-top:5px;">${statsHtml}</div>
       </div>
-      <div class="wl"><b>${r.vitorias}V</b> <span style="color:var(--red);font-weight:700;">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo} \u00b7 ${winPct}%</div>
+      <div class="wl">
+        <div class="wl-row"><b>${r.vitorias}V</b> \u00b7 <span class="loss">${r.derrotas}D</span> \u00b7 ${r.saldo >= 0 ? '+' : ''}${r.saldo}</div>
+        <div class="wl-row">Aproveitamento <b>${winPct}%</b>${net ? ` \u00b7 ${net}` : ''}</div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1171,15 +1419,18 @@ function renderRanking(){
   await checkSession();
   updateBuchudaUI();
   renderHome();
-  startPolling();
   await syncFromServer();
   updateBuchudaUI();
   updateHistoryTabs();
   renderHome();
+  startPolling();
   if (isSyncNeeded()) retrySync();
   window.addEventListener('online', retrySync);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) refreshFromServer();
+    if (!document.hidden) {
+      refreshFromServer();
+      checkAppUpdate();
+    }
   });
   window.addEventListener('focus', () => {
     refreshFromServer();
@@ -1187,13 +1438,14 @@ function renderRanking(){
   OrientationMgr.init();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.ready.then(reg => {
-      setInterval(() => reg.update(), 3000);
+      reg.update();
     });
   }
+  setTimeout(checkAppUpdate, 1500);
+  setInterval(() => {
+    if(!document.hidden) checkAppUpdate();
+  }, APP_UPDATE_INTERVAL_MS);
 })();
-
-checkAppUpdate();
-setInterval(checkAppUpdate, 3000);
 
 async function checkAppUpdate(){
   const res = await api('checkAppJs');

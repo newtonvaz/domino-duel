@@ -19,3 +19,13 @@ CREATE TABLE IF NOT EXISTS matches (
   buchuda_de_re BOOLEAN DEFAULT FALSE,
   duration_sec INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+INSERT INTO settings (key, value)
+VALUES ('modo_buchuda', 'true'::jsonb)
+ON CONFLICT (key) DO NOTHING;

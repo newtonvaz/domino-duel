@@ -7,32 +7,32 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>DOMINÓ DO TORRES — Placar & Ranking</title>
-<link rel="manifest" href="manifest.json?v=3">
-<meta name="theme-color" content="#0a0c11">
+<link rel="manifest" href="manifest-logo-domino.json">
+<meta name="theme-color" content="#071510">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Dominó Torres">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="120x120" href="icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="152x152" href="icons/icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/logo-domino-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/logo-domino-192.png">
+<link rel="apple-touch-icon" sizes="120x120" href="icons/logo-domino-192.png">
+<link rel="apple-touch-icon" sizes="152x152" href="icons/logo-domino-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/logo-domino-192.png">
+<link rel="apple-touch-icon" href="icons/logo-domino-192.png">
+<link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
 <div class="app-shell">
 
   <header class="top">
     <div class="brand">
-      <div class="tile-logo" id="logoTile"></div>
-      <h1>DOMINÓ DO TORRES 1<small>Placar &amp; Ranking</small></h1>
+      <img class="brand-logo" src="icons/logo-domino.png" alt="Dominó">
+      <h1>Dominó<small>TRADIÇÃO EM CADA JOGADA</small></h1>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span id="buchudaBall" style="width:10px;height:10px;border-radius:50%;background:var(--text-muted);cursor:pointer;flex-shrink:0;" onclick="toggleModoBuchuda()" title="Modo Buchuda"></span>
-      <span class="admin-only flex" id="adminBadge" style="align-items:center;gap:5px;font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.5px;">Admin</span>
-      <span id="syncStatus" style="font-size:11px;color:var(--orange);font-weight:600;display:none;">⏳ Pendente</span>
-      <button class="admin-toggle" id="adminToggleBtn">🔒 <span id="adminBtnLabel">Login</span></button>
+    <div class="top-actions">
+      <button class="mode-toggle" id="buchudaBall" onclick="toggleModoBuchuda()" title="Modo Buchuda" aria-label="Alternar modo Buchuda"></button>
+      <span class="admin-only flex" id="adminBadge">Admin</span>
+      <span id="syncStatus">Sincronização pendente</span>
+      <button class="admin-toggle" id="adminToggleBtn"><span id="adminBtnLabel">Login</span></button>
     </div>
   </header>
 
@@ -42,28 +42,38 @@
 
     <!-- HOME -->
     <section class="view active" id="view-home">
-      <div class="hero-tile">
-        <div class="crown">👑</div>
-        <h2 id="homeTotalMatches">0</h2>
-        <p>duelos registrados na mesa</p>
-        <div class="stat-row">
-          <div class="stat-box"><div class="num" id="statPlayers">0</div><div class="lbl">Jogadores</div></div>
-          <div class="stat-box"><div class="num" id="statBuchudas">0</div><div class="lbl">Buchudas</div></div>
-          <div class="stat-box"><div class="num" id="statRe">0</div><div class="lbl">Buchudas de ré</div></div>
-        </div>
-        <button class="btn btn-primary role-hidden" onclick="showView('match')">🁢 Nova Partida</button>
+      <button class="btn btn-primary home-new-match role-hidden" onclick="showView('match')"><span class="button-icon">▶</span> Nova partida</button>
+
+      <div class="quick-stats" aria-label="Resumo das partidas">
+        <div class="stat-box"><div class="num" id="homeTotalMatches">0</div><div class="lbl">Partidas</div></div>
+        <div class="stat-box"><div class="num" id="statPlayers">0</div><div class="lbl">Jogadores</div></div>
+        <div class="stat-box"><div class="num" id="statBuchudas">0</div><div class="lbl">Buchudas</div></div>
       </div>
 
-      <h2 class="section-title" style="font-size:18px;">Últimos duelos</h2>
+      <div class="section-heading"><div><h2 class="section-title">Últimas partidas</h2><p>RESULTADOS RECENTES</p></div><button class="text-link" onclick="showView('history')">Ver tudo</button></div>
       <div class="card" id="recentMatchesCard">
         <div class="empty-state" style="padding:16px 6px;">
           <p>Nenhuma partida registrada ainda.</p>
         </div>
       </div>
 
+      <div class="home-shortcuts">
+        <button class="shortcut-card" onclick="showView('history')"><span class="shortcut-icon icon-history"></span><span><b>Histórico de partidas</b><small>Revise todos os duelos</small></span><span class="chevron">›</span></button>
+        <button class="shortcut-card" onclick="showView('ranking')"><span class="shortcut-icon icon-chart"></span><span><b>Estatísticas</b><small>Ranking e desempenho</small></span><span class="chevron">›</span></button>
+      </div>
+
       <div class="admin-only" id="pendingSection" style="margin-top:14px;">
         <h2 class="section-title" style="font-size:18px;">Novos usuários</h2>
         <div class="card" id="pendingUsersList"></div>
+      </div>
+    </section>
+
+    <!-- MORE -->
+    <section class="view" id="view-more">
+      <div class="view-heading"><h2 class="section-title">Mais</h2><p>RECURSOS DO JOGO</p></div>
+      <div class="more-menu">
+        <button class="shortcut-card" onclick="showView('ranking')"><span class="shortcut-icon icon-chart"></span><span><b>Estatísticas</b><small>Ranking e desempenho das duplas</small></span><span class="chevron">›</span></button>
+        <button class="shortcut-card" onclick="showView('players')"><span class="shortcut-icon icon-more"></span><span><b>Jogadores</b><small>Gerencie os participantes da mesa</small></span><span class="chevron">›</span></button>
       </div>
     </section>
 
@@ -80,16 +90,16 @@
     <!-- MATCH -->
     <section class="view" id="view-match">
       <div id="matchSetupWrap">
-        <h2 class="section-title">Nova Partida</h2>
-        <p class="subtle">Dominó de 4: monte as duas duplas. Cada rodada vale 6 pontos.</p>
+        <div class="view-heading"><h2 class="section-title">Partida</h2><p>REGISTRE CADA JOGADA</p></div>
+        <div class="match-intro"><span class="intro-icon icon-calendar"></span><div><b>Data da partida</b><small>Defina a data antes de começar</small></div></div>
 
         <div class="duo-block">
-          <div class="duo-title">Dupla A</div>
+          <div class="duo-title"><span class="team-mark">A</span> Dupla A</div>
           <div class="field search-field"><input type="text" id="selA1" placeholder="Jogador 1..." autocomplete="off"><div class="player-dd"></div></div>
           <div class="field search-field" style="margin-bottom:0;"><input type="text" id="selA2" placeholder="Jogador 2..." autocomplete="off"><div class="player-dd"></div></div>
         </div>
         <div class="duo-block">
-          <div class="duo-title team-b">Dupla B</div>
+          <div class="duo-title team-b"><span class="team-mark">B</span> Dupla B</div>
           <div class="field search-field"><input type="text" id="selB1" placeholder="Jogador 1..." autocomplete="off"><div class="player-dd"></div></div>
           <div class="field search-field" style="margin-bottom:0;"><input type="text" id="selB2" placeholder="Jogador 2..." autocomplete="off"><div class="player-dd"></div></div>
         </div>
@@ -99,7 +109,7 @@
           <input type="date" id="matchDate">
         </div>
         <div class="error-text" id="matchSetupError"></div>
-        <button class="btn btn-primary" onclick="startMatch()">Iniciar Duelo ▶</button>
+        <button class="btn btn-primary match-start" onclick="startMatch()">▶ Iniciar partida</button>
       </div>
 
       <div id="liveMatchWrap" style="display:none;"></div>
@@ -107,7 +117,7 @@
 
     <!-- HISTORY -->
     <section class="view" id="view-history">
-      <h2 class="section-title">Histórico</h2>
+      <div class="view-heading"><h2 class="section-title">Histórico</h2><p>SUAS PARTIDAS SEMPRE AQUI</p></div>
       <div class="period-tabs" id="historyFilterBar" style="margin-bottom:12px;">
         <button class="period-tab active" data-filter="all" onclick="setHistoryFilter('all')">Todas</button>
         <button class="period-tab" data-filter="buchuda" onclick="setHistoryFilter('buchuda')">Buchuda</button>
@@ -118,7 +128,7 @@
 
     <!-- RANKING -->
     <section class="view" id="view-ranking">
-      <h2 class="section-title">Ranking</h2>
+      <div class="view-heading"><h2 class="section-title">Estatísticas</h2><p>DESEMPENHO DOS JOGADORES</p></div>
       <div class="period-tabs">
         <button class="period-tab" data-period="week">Semana</button>
         <button class="period-tab" data-period="month">Mês</button>
@@ -133,17 +143,17 @@
         <span id="periodLabel"></span>
         <button onclick="shiftPeriod(1)">›</button>
       </div>
+      <div class="ranking-summary" id="rankingSummary"></div>
       <div id="rankingList" style="margin-top:14px;"></div>
     </section>
 
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-view="home"><span class="ic">🏠</span>Início</button>
-    <button class="nav-btn" data-view="players"><span class="ic">👥</span>Jogadores</button>
-    <button class="nav-btn role-hidden" data-view="match"><span class="ic">🁢</span>Partida</button>
-    <button class="nav-btn" data-view="history"><span class="ic">📜</span>Histórico</button>
-    <button class="nav-btn" data-view="ranking"><span class="ic">🏆</span>Ranking</button>
+    <button class="nav-btn active" data-view="home"><span class="ic icon-home"></span>Início</button>
+    <button class="nav-btn role-hidden" data-view="match"><span class="ic icon-domino"></span>Partida</button>
+    <button class="nav-btn" data-view="history"><span class="ic icon-history"></span>Histórico</button>
+    <button class="nav-btn" data-view="more"><span class="ic icon-more"></span>Mais</button>
   </nav>
 </div>
 
@@ -195,7 +205,7 @@
   </div>
 </div>
 
-<script src="js/app.js?v=21"></script>
+<script src="js/app.js?v=24"></script>
 <script>
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {

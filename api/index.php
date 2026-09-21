@@ -29,10 +29,10 @@ switch ($action) {
                 }
             }
             
-            // Insert or update players
-            $stmt = $pdo->prepare('INSERT INTO players (id, name, photo) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = ?, photo = ?');
+            // Insert or update players using SQLite's native upsert syntax.
+            $stmt = $pdo->prepare('INSERT INTO players (id, name, photo, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, photo = excluded.photo');
             foreach ($players as $player) {
-                $stmt->execute([$player['id'], $player['name'], $player['photo'], $player['name'], $player['photo']]);
+                $stmt->execute([$player['id'], $player['name'], $player['photo'] ?? null, date('Y-m-d H:i:s')]);
             }
             
             $pdo->commit();
@@ -46,7 +46,7 @@ switch ($action) {
 
     /* ---------- MATCHES ---------- */
     case 'listMatches':
-        $stmt = $pdo->query('SELECT id, date, team_a, team_b, score_a, score_b, winner, buchuda, buchuda_de_re, duration_sec FROM matches ORDER BY date DESC');
+        $stmt = $pdo->query('SELECT id, date, team_a, team_b, score_a, score_b, winner, buchuda, buchuda_de_re, duration_sec FROM matches ORDER BY DATE(date) DESC, id DESC');
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$r) {
             $r['team_a'] = json_decode($r['team_a'], true);
@@ -73,13 +73,20 @@ switch ($action) {
                 $placeholders = implode(',', array_fill(0, count($toDelete), '?'));
                 $pdo->prepare("DELETE FROM matches WHERE id IN ($placeholders)")->execute(array_values($toDelete));
             }
-            $stmt = $pdo->prepare('REPLACE INTO matches (id, date, team_a, team_b, score_a, score_b, winner, buchuda, buchuda_de_re, duration_sec) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt = $pdo->prepare('INSERT INTO matches (id, date, team_a, team_b, score_a, score_b, winner, buchuda, buchuda_de_re, duration_sec, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET date = excluded.date, team_a = excluded.team_a, team_b = excluded.team_b, score_a = excluded.score_a, score_b = excluded.score_b, winner = excluded.winner, buchuda = excluded.buchuda, buchuda_de_re = excluded.buchuda_de_re, duration_sec = excluded.duration_sec');
             foreach ($matches as $m) {
+                // A data da partida é uma data de jogo, não a hora de gravação.
+                // Ao receber uma data manual válida, preservamos o dia escolhido
+                // pelo usuário e usamos meio-dia para evitar mudança de dia por fuso.
+                $rawDate = (string) ($m['date'] ?? '');
+                $matchDate = preg_match('/^\d{4}-\d{2}-\d{2}/', $rawDate)
+                    ? substr($rawDate, 0, 10) . ' 12:00:00'
+                    : $rawDate;
                 $stmt->execute([
-                    $m['id'], $m['date'], json_encode($m['teamA']), json_encode($m['teamB']),
+                    $m['id'], $matchDate, json_encode($m['teamA']), json_encode($m['teamB']),
                     $m['scoreA'], $m['scoreB'], $m['winner'],
-                    $m['buchuda'] ? 1 : 0, $m['buchudaDeRe'] ? 1 : 0,
-                    $m['durationSec'] ?? null
+                    !empty($m['buchuda']) ? 1 : 0, !empty($m['buchudaDeRe']) ? 1 : 0,
+                    $m['durationSec'] ?? 0, date('Y-m-d H:i:s')
                 ]);
             }
             $pdo->commit();
@@ -89,6 +96,28 @@ switch ($action) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
         }
+        break;
+
+    case 'deleteMatch':
+        $input = jsonInput();
+        $id = $input['id'] ?? '';
+        if ($id === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing id']);
+            break;
+        }
+        $stmt = $pdo->prepare('DELETE FROM matches WHERE id = ?');
+        $stmt->execute([$id]);
+        $backupFile = __DIR__ . '/../data/backup.json';
+        if (file_exists($backupFile)) {
+            $backup = json_decode(file_get_contents($backupFile), true);
+            if (isset($backup['matches']) && is_array($backup['matches'])) {
+                $backup['matches'] = array_values(array_filter($backup['matches'], fn($m) => ($m['id'] ?? null) !== $id));
+                $backup['timestamp'] = date('Y-m-d H:i:s');
+                file_put_contents($backupFile, json_encode($backup, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            }
+        }
+        echo json_encode(['ok' => true]);
         break;
 
     /* ---------- USERS ---------- */
@@ -105,8 +134,8 @@ switch ($action) {
         $role = $isFirst ? 'admin' : 'user';
         $status = $isFirst ? 'approved' : 'pending';
         $hash = password_hash($input['password'], PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO users (email, password, role, status) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$input['email'], $hash, $role, $status]);
+        $stmt = $pdo->prepare('INSERT INTO users (email, password, role, status, created_at) VALUES (?, ?, ?, ?, ?)');
+        $stmt->execute([$input['email'], $hash, $role, $status, date('Y-m-d H:i:s')]);
         echo json_encode(['ok' => true, 'email' => $input['email'], 'role' => $role, 'status' => $status]);
         break;
 

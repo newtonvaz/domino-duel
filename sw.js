@@ -1,18 +1,19 @@
-const CACHE = 'domino-v27';
+const CACHE = 'domino-v34';
 
 const STATIC = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/app.js',
-  '/manifest.json',
-  '/icons/favicon.png',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-1024.png',
+  '/manifest-logo-domino.json',
+  '/icons/logo-domino-32.png',
+  '/icons/logo-domino-192.png',
+  '/icons/logo-domino-512.png',
+  '/icons/logo-domino-1024.png',
+  '/icons/logo-domino.png',
 ];
 
-const MANIFEST_CACHE = 'domino-manifest-v1';
+const MANIFEST_CACHE = 'domino-manifest-v4';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -39,15 +40,36 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
   const url = new URL(e.request.url);
-  if (url.pathname === '/manifest.json' || url.pathname.startsWith('/icons/')) {
+  if(url.pathname === '/data/backup.json' || url.pathname === '/data/settings.json') {
+    e.respondWith(networkFirstData(e.request));
+    return;
+  }
+  if (url.pathname.endsWith('.json') || url.pathname.startsWith('/icons/')) {
     e.respondWith(cacheFirst(e.request));
   } else {
-    e.respondWith(networkFirst(e.request));
+    e.respondWith(staleWhileRevalidate(e.request, e));
   }
 });
 
+async function networkFirstData(req) {
+  try {
+    const res = await fetch(req, {cache: 'no-store'});
+    if(res && res.ok){
+      const cache = await caches.open(CACHE);
+      await cache.put(req, res.clone());
+    }
+    return res;
+  } catch {
+    const cached = await caches.match(req, {ignoreSearch: true});
+    return cached || new Response(JSON.stringify({error: 'offline'}), {
+      status: 503,
+      headers: {'Content-Type': 'application/json'}
+    });
+  }
+}
+
 async function cacheFirst(req) {
-  const cached = await caches.match(req);
+  const cached = await caches.match(req, {ignoreSearch: true});
   if (cached) return cached;
   try {
     const res = await fetch(req);
@@ -59,18 +81,18 @@ async function cacheFirst(req) {
   }
 }
 
-async function networkFirst(req) {
-  try {
-    const url = new URL(req.url);
-    const isAsset = url.pathname === '/' || url.pathname.endsWith('.html') || url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
-    // Force validation with the server to bypass browser's HTTP cache when fetching main assets
-    const options = isAsset ? { cache: 'no-cache' } : {};
-    const res = await fetch(req, options);
-    const cache = await caches.open(CACHE);
-    cache.put(req, res.clone());
+async function staleWhileRevalidate(req, event) {
+  const cached = await caches.match(req, {ignoreSearch: true});
+  const update = fetch(req, {cache: 'no-cache'}).then(async res => {
+    if(res && res.ok){
+      const cache = await caches.open(CACHE);
+      await cache.put(req, res.clone());
+    }
     return res;
-  } catch {
-    const cached = await caches.match(req);
-    return cached || new Response(JSON.stringify({error: 'offline'}), {status: 503});
-  }
+  }).catch(() => null);
+
+  event.waitUntil(update);
+  if(cached) return cached;
+  const network = await update;
+  return network || new Response(JSON.stringify({error: 'offline'}), {status: 503});
 }
