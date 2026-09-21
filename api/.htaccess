@@ -1,3 +1,6 @@
 RewriteEngine On
+<FilesMatch "^config\.local\.json$">
+  Require all denied
+</FilesMatch>
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^(.*)$ index.php?action=$1 [QSA,L]

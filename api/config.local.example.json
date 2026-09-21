@@ -1,0 +1,5 @@
+{
+  "SUPABASE_URL": "https://seu-projeto.supabase.co",
+  "SUPABASE_PUBLISHABLE_KEY": "sua-chave-publishable",
+  "SUPABASE_SERVICE_ROLE_KEY": "sua-chave-secreta-do-servidor"
+}

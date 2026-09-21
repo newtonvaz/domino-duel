@@ -10,3 +10,4 @@
 # Env
 .env
 .env.local
+/api/config.local.json

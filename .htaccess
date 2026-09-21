@@ -2,7 +2,7 @@ AddType application/manifest+json json
 AddType image/png png
 
 # Never expose server credentials used by the Supabase API.
-<FilesMatch "^\.env(?:\..*)?$">
+<FilesMatch "^(?:\.env(?:\..*)?|config\.local\.json)$">
   Require all denied
 </FilesMatch>
 
