@@ -290,33 +290,6 @@ switch ($action) {
         echo json_encode(['ok' => true]);
         break;
 
-    case 'requestPasswordReset':
-        $input = jsonInput();
-        $email = strtolower(trim((string) ($input['email'] ?? '')));
-        $resetBody = ['email' => $email];
-        $redirectTo = trim((string) ($input['redirect_to'] ?? ''));
-        // Accept only an absolute HTTP(S) URL from the current app origin.
-        // This keeps recovery links from becoming an open redirect.
-        if ($redirectTo !== '' && filter_var($redirectTo, FILTER_VALIDATE_URL)) {
-            $redirectHost = parse_url($redirectTo, PHP_URL_HOST);
-            $requestHost = preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? ''));
-            if ($redirectHost && $requestHost && strcasecmp($redirectHost, $requestHost) === 0) {
-                $resetBody['redirect_to'] = $redirectTo;
-            }
-        }
-        $reset = supabaseRequest(
-            'POST',
-            '/auth/v1/recover',
-            $resetBody,
-            null,
-            $supabasePublishableKey
-        );
-        echo json_encode([
-            'ok' => $reset['status'] >= 200 && $reset['status'] < 300,
-            'message' => 'Se o e-mail estiver cadastrado, o link de recuperação será enviado.'
-        ]);
-        break;
-
     case 'listUsers':
         if (!requireSupabaseAdmin()) break;
         $users = supabaseRequest(
@@ -375,52 +348,6 @@ switch ($action) {
             ['Prefer: return=minimal']
         );
         echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
-        break;
-
-    case 'resetUserPassword':
-        if (!requireSupabaseAdmin()) break;
-        $input = jsonInput();
-        $id = (string) ($input['id'] ?? '');
-        $password = (string) ($input['password'] ?? '');
-        if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Usuário inválido.']);
-            break;
-        }
-        if (strlen($password) < 6) {
-            http_response_code(400);
-            echo json_encode(['error' => 'A nova senha deve ter pelo menos 6 caracteres.']);
-            break;
-        }
-        $response = supabaseRequest(
-            'PUT',
-            '/auth/v1/admin/users/' . rawurlencode($id),
-            ['password' => $password],
-            null,
-            $supabaseServiceKey
-        );
-        if ($response['status'] < 200 || $response['status'] >= 300) {
-            $errorBody = is_array($response['body'] ?? null) ? $response['body'] : [];
-            $errorMessage = $errorBody['msg'] ?? $errorBody['message'] ?? $errorBody['error_description'] ?? $errorBody['error'] ?? 'Não foi possível redefinir a senha.';
-            $errorCode = $errorBody['error_code'] ?? $errorBody['code'] ?? null;
-            error_log('Supabase password reset failed: HTTP ' . $response['status'] . ($errorCode ? ' code=' . $errorCode : ''));
-            http_response_code($response['status'] === 0 ? 500 : 400);
-            echo json_encode([
-                'error' => $errorMessage,
-                'status' => $response['status'],
-                'code' => $errorCode
-            ]);
-            break;
-        }
-        supabaseRequest(
-            'PATCH',
-            '/rest/v1/profiles?id=eq.' . rawurlencode($id),
-            ['password_change_required' => false, 'password_reset_offered' => true],
-            null,
-            $supabaseServiceKey,
-            ['Prefer: return=minimal']
-        );
-        echo json_encode(['ok' => true]);
         break;
 
     case 'forceUserPasswordChange':

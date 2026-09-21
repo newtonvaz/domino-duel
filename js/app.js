@@ -121,7 +121,7 @@ async function api(method, body){
         // Login/registro precisam devolver ao chamador os detalhes do backend
         // mesmo quando a resposta é 401/409. O login usa esse retorno para
         // oferecer a troca de senha somente na primeira tentativa elegível.
-        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery' || method === 'resetUserPassword' || method === 'forceUserPasswordChange'){
+        if(method === 'login' || method === 'register' || method === 'completeFirstAccessPasswordChange' || method === 'forceUserPasswordChange'){
           try{
             const payload = await res.json();
             if(payload && typeof payload === 'object') return payload;
@@ -223,7 +223,6 @@ let refreshPromise = null;
 let passwordChangeMode = null;
 let passwordChangeToken = null;
 let passwordChangeResolve = null;
-let adminResetUserId = null;
 const POLL_INTERVAL_MS = 30000;
 const APP_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -382,11 +381,9 @@ document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
 function openAdminModal(){
   document.getElementById('adminError').textContent = '';
   document.getElementById('adminRegError').textContent = '';
-  document.getElementById('adminResetError').textContent = '';
   document.getElementById('passwordChangeError').textContent = '';
   document.getElementById('adminEmailInput').value = '';
   document.getElementById('adminPasswordInput').value = '';
-  document.getElementById('adminResetEmailInput').value = '';
   document.getElementById('adminRegEmailInput').value = '';
   document.getElementById('adminRegPasswordInput').value = '';
   document.getElementById('adminRegConfirmInput').value = '';
@@ -398,7 +395,6 @@ function openAdminModal(){
     document.getElementById('adminModalSub').textContent = '';
     document.getElementById('adminLoginForm').style.display = 'none';
     document.getElementById('adminRegisterForm').style.display = 'none';
-    document.getElementById('adminPasswordResetForm').style.display = 'none';
     document.getElementById('adminPasswordChangeForm').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'block';
   } else {
@@ -416,37 +412,14 @@ function closeAdminModal(){
 function showAdminLogin(){
   document.getElementById('adminLoginForm').style.display = 'block';
   document.getElementById('adminRegisterForm').style.display = 'none';
-  document.getElementById('adminPasswordResetForm').style.display = 'none';
   document.getElementById('adminPasswordChangeForm').style.display = 'none';
   document.getElementById('adminModalTitle').textContent = 'Login do Usu\u00e1rio';
   document.getElementById('adminModalSub').textContent = 'Entre com o seu e-mail e senha ou crie uma conta.';
   document.getElementById('adminError').textContent = '';
 }
-function showPasswordReset(){
-  document.getElementById('adminPasswordResetForm').style.display = 'block';
-  document.getElementById('adminLoginForm').style.display = 'none';
-  document.getElementById('adminRegisterForm').style.display = 'none';
-  document.getElementById('adminPasswordChangeForm').style.display = 'none';
-  document.getElementById('adminModalTitle').textContent = 'Trocar senha';
-  document.getElementById('adminModalSub').textContent = 'Recupere o acesso usando seu e-mail pessoal.';
-  document.getElementById('adminResetEmailInput').value = document.getElementById('adminEmailInput').value.trim();
-  document.getElementById('adminResetError').textContent = '';
-  setTimeout(()=>document.getElementById('adminResetEmailInput').focus(), 50);
-}
-async function submitPasswordReset(){
-  const email = document.getElementById('adminResetEmailInput').value.trim();
-  const err = document.getElementById('adminResetError');
-  if(!email || !email.includes('@')){ err.textContent = 'Informe um e-mail válido.'; return; }
-  const response = await api('requestPasswordReset', {email, redirect_to: `${location.origin}${location.pathname}`});
-  err.style.color = response && response.ok ? 'var(--green)' : 'var(--red)';
-  err.textContent = response && response.ok
-    ? 'Link enviado. Confira sua caixa de entrada e spam.'
-    : ((response && response.message) || 'Não foi possível enviar o link agora.');
-}
 function showAdminRegister(){
   document.getElementById('adminLoginForm').style.display = 'none';
   document.getElementById('adminRegisterForm').style.display = 'block';
-  document.getElementById('adminPasswordResetForm').style.display = 'none';
   document.getElementById('adminPasswordChangeForm').style.display = 'none';
   document.getElementById('adminModalTitle').textContent = 'Criar Conta Admin';
   document.getElementById('adminModalSub').textContent = 'Crie seu acesso de administrador.';
@@ -465,6 +438,7 @@ async function submitLogin(){
     if(res.password_change_required && !(await requestFirstAccessPasswordChange())){
       localStorage.removeItem('duelo_access_token');
       localStorage.removeItem('duelo_refresh_token');
+      openAdminModal();
       err.textContent = 'A troca de senha é obrigatória para continuar.';
       shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
       return;
@@ -489,7 +463,6 @@ function openPasswordChangeForm(mode, token = null){
   passwordChangeToken = token;
   document.getElementById('adminLoginForm').style.display = 'none';
   document.getElementById('adminRegisterForm').style.display = 'none';
-  document.getElementById('adminPasswordResetForm').style.display = 'none';
   document.getElementById('adminPasswordChangeForm').style.display = 'block';
   document.getElementById('adminModalTitle').textContent = 'Criar nova senha';
   document.getElementById('adminModalSub').textContent = '';
@@ -558,43 +531,6 @@ async function submitPasswordChangeForm(){
 
 async function requestFirstAccessPasswordChange(){
   return await openPasswordChangeForm('first-access');
-}
-
-async function handlePasswordRecoveryPromptFallback(){
-  const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
-  const token = params.get('access_token');
-  if(params.get('type') !== 'recovery' || !token) return;
-
-  const password = window.prompt('Digite sua nova senha (mínimo de 6 caracteres):');
-  const confirmPassword = password === null ? null : window.prompt('Confirme sua nova senha:');
-  if(!password || password.length < 6 || password !== confirmPassword){
-    window.alert('As senhas não conferem ou têm menos de 6 caracteres.');
-    return;
-  }
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    method: 'PUT',
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({password})
-  });
-  if(response.ok){
-    try{
-      await fetch(`${API_URL}?action=completePasswordRecovery`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      });
-    }catch(e){}
-    window.alert('Senha criada com sucesso. Agora faça login.');
-    history.replaceState(null, '', location.pathname + location.search);
-  } else {
-    window.alert('Não foi possível criar a nova senha. Solicite outro link.');
-  }
 }
 
 // Password recovery uses the same typed form as first-access changes.
@@ -684,41 +620,6 @@ async function approveUser(id){
 async function rejectUser(id){
   await api('rejectUser', {id});
   renderPendingUsers();
-}
-
-function openUserPasswordModal(id, encodedEmail){
-  if(!user || user.role !== 'admin') return;
-  adminResetUserId = id;
-  document.getElementById('userPasswordEmail').value = decodeURIComponent(encodedEmail || '');
-  document.getElementById('userPasswordInput').value = '';
-  document.getElementById('userPasswordConfirmInput').value = '';
-  document.getElementById('userPasswordError').textContent = '';
-  document.getElementById('userPasswordModalOverlay').classList.add('open');
-  setTimeout(()=>document.getElementById('userPasswordInput').focus(), 50);
-}
-
-function closeUserPasswordModal(){
-  adminResetUserId = null;
-  document.getElementById('userPasswordModalOverlay').classList.remove('open');
-}
-
-async function submitUserPasswordReset(){
-  if(!adminResetUserId || !user || user.role !== 'admin') return;
-  const password = document.getElementById('userPasswordInput').value;
-  const confirmation = document.getElementById('userPasswordConfirmInput').value;
-  const error = document.getElementById('userPasswordError');
-  if(password.length < 6){ error.textContent = 'A nova senha deve ter pelo menos 6 caracteres.'; return; }
-  if(password !== confirmation){ error.textContent = 'As senhas não conferem.'; return; }
-  const response = await api('resetUserPassword', {id: adminResetUserId, password});
-  if(response && response.ok){
-    closeUserPasswordModal();
-    window.alert('Senha redefinida com sucesso.');
-    return;
-  }
-  const detail = response && (response.code || response.status)
-    ? ` (${[response.code, response.status ? `HTTP ${response.status}` : ''].filter(Boolean).join(' · ')})`
-    : '';
-  error.textContent = ((response && response.error) || 'Não foi possível redefinir a senha.') + detail;
 }
 
 async function forceUserPasswordChange(id, encodedEmail){
@@ -863,7 +764,7 @@ function renderPendingUsers(){
     usersList.innerHTML = approved.length ? approved.map(u => `
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
         <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:var(--text-muted);">${u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'}</small></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="openUserPasswordModal('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Redefinir senha</button><button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Forçar troca</button></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Forçar troca</button></div>
       </div>
     `).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário aprovado.</p></div>';
   });

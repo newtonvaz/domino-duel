@@ -120,20 +120,6 @@ function supabaseProfileById($id, $bearerToken = null) {
         : null;
 }
 
-function supabaseProfileByEmail($email) {
-    global $supabaseServiceKey;
-    $response = supabaseRequest(
-        'GET',
-        '/rest/v1/profiles?select=id,email,role,status,password_reset_offered,password_change_required&email=eq.' . rawurlencode(strtolower(trim($email))) . '&limit=1',
-        null,
-        null,
-        $supabaseServiceKey
-    );
-    return ($response['status'] >= 200 && $response['status'] < 300 && !empty($response['body'][0]))
-        ? $response['body'][0]
-        : null;
-}
-
 function requireSupabaseAdmin() {
     $profile = supabaseCurrentProfile();
     if (!$profile || $profile['role'] !== 'admin' || $profile['status'] !== 'approved') {

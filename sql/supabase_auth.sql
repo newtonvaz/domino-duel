@@ -34,10 +34,10 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------
--- Migração: os perfis importados do MySQL antigo (InfinityFree) têm senhas que
--- não valem no Supabase Auth. Ignore essas senhas e marque todos como
--- "primeiro acesso", para que a troca de senha seja oferecida UMA única vez
--- no primeiro login. Execute uma vez no SQL Editor do Supabase.
+-- Migração de 21/09/2026: a partir de hoje, TODO usuário (inclusive admin)
+-- deve trocar a senha no primeiro acesso. Esta atualização marca todos os
+-- perfis como "primeiro acesso"; a flag é desligada automaticamente quando o
+-- usuário conclui a troca pelo aplicativo. Execute no SQL Editor do Supabase.
 -- ---------------------------------------------------------------------------
 UPDATE public.profiles
 SET password_change_required = TRUE,
