@@ -123,30 +123,58 @@ switch ($action) {
     /* ---------- USERS ---------- */
     case 'register':
         $input = jsonInput();
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
-        $stmt->execute([$input['email']]);
-        if ($stmt->fetch()) {
-            http_response_code(409);
-            echo json_encode(['error' => 'E-mail j\u00e1 cadastrado.']);
+        $auth = supabaseRequest(
+            'POST',
+            '/auth/v1/signup',
+            ['email' => $input['email'] ?? '', 'password' => $input['password'] ?? ''],
+            null,
+            $supabasePublishableKey
+        );
+        if ($auth['status'] < 200 || $auth['status'] >= 300 || empty($auth['body']['user']['id'])) {
+            http_response_code($auth['status'] === 422 ? 409 : 400);
+            echo json_encode(['error' => $auth['body']['msg'] ?? $auth['body']['message'] ?? 'Não foi possível criar a conta.']);
             break;
         }
-        $isFirst = $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() == 0;
-        $role = $isFirst ? 'admin' : 'user';
-        $status = $isFirst ? 'approved' : 'pending';
-        $hash = password_hash($input['password'], PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO users (email, password, role, status, created_at) VALUES (?, ?, ?, ?, ?)');
-        $stmt->execute([$input['email'], $hash, $role, $status, date('Y-m-d H:i:s')]);
-        echo json_encode(['ok' => true, 'email' => $input['email'], 'role' => $role, 'status' => $status]);
+        $profile = [
+            'id' => $auth['body']['user']['id'],
+            'email' => $input['email'],
+            'role' => 'user',
+            'status' => 'pending'
+        ];
+        $profileWrite = supabaseRequest(
+            'POST',
+            '/rest/v1/profiles?on_conflict=id',
+            $profile,
+            null,
+            $supabaseServiceKey,
+            ['Prefer: resolution=merge-duplicates,return=minimal']
+        );
+        if ($profileWrite['status'] < 200 || $profileWrite['status'] >= 300) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Conta criada, mas não foi possível criar o perfil de acesso.']);
+            break;
+        }
+        echo json_encode(['ok' => true, 'email' => $input['email'], 'role' => 'user', 'status' => 'pending']);
         break;
 
     case 'login':
         $input = jsonInput();
-        $stmt = $pdo->prepare('SELECT id, email, password, role, status FROM users WHERE email = ?');
-        $stmt->execute([$input['email']]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$user || !password_verify($input['password'], $user['password'])) {
+        $auth = supabaseRequest(
+            'POST',
+            '/auth/v1/token?grant_type=password',
+            ['email' => $input['email'] ?? '', 'password' => $input['password'] ?? ''],
+            null,
+            $supabasePublishableKey
+        );
+        if ($auth['status'] < 200 || $auth['status'] >= 300 || empty($auth['body']['user']['id'])) {
             http_response_code(401);
             echo json_encode(['error' => 'E-mail ou senha incorretos.']);
+            break;
+        }
+        $user = supabaseProfileById($auth['body']['user']['id']);
+        if (!$user) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Perfil de acesso não configurado.']);
             break;
         }
         if ($user['status'] === 'pending') {
@@ -159,26 +187,68 @@ switch ($action) {
             echo json_encode(['error' => 'Seu cadastro foi rejeitado.']);
             break;
         }
-        echo json_encode(['ok' => true, 'email' => $user['email'], 'role' => $user['role']]);
+        echo json_encode([
+            'ok' => true,
+            'email' => $user['email'],
+            'role' => $user['role'],
+            'access_token' => $auth['body']['access_token'] ?? null,
+            'refresh_token' => $auth['body']['refresh_token'] ?? null,
+            'expires_in' => $auth['body']['expires_in'] ?? null
+        ]);
+        break;
+
+    case 'session':
+        $profile = supabaseCurrentProfile();
+        if (!$profile || $profile['status'] !== 'approved') {
+            http_response_code(401);
+            echo json_encode(['error' => 'Sessão inválida.']);
+            break;
+        }
+        echo json_encode(['ok' => true, 'email' => $profile['email'], 'role' => $profile['role']]);
+        break;
+
+    case 'logout':
+        echo json_encode(['ok' => true]);
         break;
 
     case 'listUsers':
-        $stmt = $pdo->query('SELECT id, email, role, status, created_at FROM users ORDER BY created_at');
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        if (!requireSupabaseAdmin()) break;
+        $users = supabaseRequest(
+            'GET',
+            '/rest/v1/profiles?select=id,email,role,status,created_at&order=created_at.asc',
+            null,
+            null,
+            $supabaseServiceKey
+        );
+        echo json_encode($users['body']);
         break;
 
     case 'approveUser':
         $input = jsonInput();
-        $stmt = $pdo->prepare("UPDATE users SET status = 'approved' WHERE id = ? AND status = 'pending'");
-        $stmt->execute([$input['id']]);
-        echo json_encode(['ok' => true]);
+        if (!requireSupabaseAdmin()) break;
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($input['id'] ?? ''),
+            ['status' => 'approved'],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 
     case 'rejectUser':
         $input = jsonInput();
-        $stmt = $pdo->prepare("DELETE FROM users WHERE id = ? AND status = 'pending'");
-        $stmt->execute([$input['id']]);
-        echo json_encode(['ok' => true]);
+        if (!requireSupabaseAdmin()) break;
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($input['id'] ?? ''),
+            ['status' => 'rejected'],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 
     case 'updateUserRole':
@@ -189,16 +259,24 @@ switch ($action) {
             echo json_encode(['error' => 'Invalid role']);
             break;
         }
-        $stmt = $pdo->prepare('UPDATE users SET role = ? WHERE id = ?');
-        $stmt->execute([$input['role'], $input['id']]);
-        echo json_encode(['ok' => true]);
+        if (!requireSupabaseAdmin()) break;
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($input['id'] ?? ''),
+            ['role' => $input['role']],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 
     case 'deleteUser':
         $input = jsonInput();
-        $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
-        $stmt->execute([$input['id']]);
-        echo json_encode(['ok' => true]);
+        if (!requireSupabaseAdmin()) break;
+        $id = rawurlencode($input['id'] ?? '');
+        $response = supabaseRequest('DELETE', '/auth/v1/admin/users/' . $id, null, null, $supabaseServiceKey);
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 
     /* ---------- APP VERSION ---------- */

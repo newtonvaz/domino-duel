@@ -165,7 +165,12 @@ async function api(method, body){
     try{
       const res = await fetch(`${endpoint}?action=${method}`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          ...(localStorage.getItem('duelo_access_token')
+            ? {Authorization: `Bearer ${localStorage.getItem('duelo_access_token')}`}
+            : {})
+        },
         body: body ? JSON.stringify(body) : undefined
       });
       if(!res.ok){
@@ -375,10 +380,23 @@ function showView(id){
 }
 
 /* ---------- ADMIN (API) ---------- */
-function checkSession(){
-  const raw = localStorage.getItem('duelo_user');
-  if(raw) user = JSON.parse(raw);
-  else user = null;
+async function checkSession(){
+  const token = localStorage.getItem('duelo_access_token');
+  if(!token){
+    user = null;
+    updateAuthUI();
+    return;
+  }
+  const session = await api('session');
+  if(session && session.ok){
+    user = {email: session.email, role: session.role};
+    localStorage.setItem('duelo_user', JSON.stringify(user));
+  } else {
+    user = null;
+    localStorage.removeItem('duelo_user');
+    localStorage.removeItem('duelo_access_token');
+    localStorage.removeItem('duelo_refresh_token');
+  }
   updateAuthUI();
 }
 
@@ -445,22 +463,12 @@ async function submitLogin(){
   const pass = document.getElementById('adminPasswordInput').value;
   const err = document.getElementById('adminError');
   if(!email || !pass){ err.textContent = 'Preencha e-mail e senha.'; return; }
-  const creds = JSON.parse(localStorage.getItem('duelo_credentials') || '{}');
-  if(creds.email === email && creds.password === pass){
-    user = {email: creds.email, role: creds.role};
-    localStorage.setItem('duelo_user', JSON.stringify(user));
-    updateAuthUI();
-    closeAdminModal();
-    renderPlayers();
-    startPolling();
-    if(user.role === 'admin') renderPendingUsers();
-    return;
-  }
   const res = await api('login', {email, password: pass});
   if(res && res.ok){
     user = {email: res.email, role: res.role};
+    if(res.access_token) localStorage.setItem('duelo_access_token', res.access_token);
+    if(res.refresh_token) localStorage.setItem('duelo_refresh_token', res.refresh_token);
     localStorage.setItem('duelo_user', JSON.stringify(user));
-    localStorage.setItem('duelo_credentials', JSON.stringify({email, password: pass, role: res.role}));
     updateAuthUI();
     closeAdminModal();
     renderPlayers();
@@ -517,8 +525,11 @@ async function rejectUser(id){
 
 function logout(){
   stopPolling();
+  api('logout');
   user = null;
   localStorage.removeItem('duelo_user');
+  localStorage.removeItem('duelo_access_token');
+  localStorage.removeItem('duelo_refresh_token');
   try { closeAdminModal(); } catch(e) {}
   location.reload();
 }

@@ -9,18 +9,44 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const root = path.resolve(__dirname, '..');
 
 if (!supabaseUrl || !serviceRoleKey) {
-  console.error('Defina SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY antes de executar.');
+  console.error('Defina SUPABASE_URL e SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_ROLE_KEY) antes de executar.');
   process.exit(1);
 }
 
 const backup = JSON.parse(fs.readFileSync(path.join(root, 'data', 'backup.json'), 'utf8'));
 const settings = JSON.parse(fs.readFileSync(path.join(root, 'data', 'settings.json'), 'utf8'));
+const sqlitePath = path.join(root, 'data', 'dominoduelpro.sqlite');
+
+function localUsers() {
+  const sql = 'SELECT id, email, password, role, status, created_at FROM users ORDER BY id';
+  return JSON.parse(execFileSync('sqlite3', ['-json', sqlitePath, sql], {encoding: 'utf8'}));
+}
+
+async function supabaseRequest(endpoint, options = {}) {
+  const response = await fetch(`${supabaseUrl}${endpoint}`, {
+    ...options,
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text();
+  let body = {};
+  try { body = text ? JSON.parse(text) : {}; } catch {}
+  if (!response.ok) {
+    throw new Error(`${endpoint}: HTTP ${response.status} — ${text}`);
+  }
+  return body;
+}
 
 async function upsert(table, rows, conflictColumn) {
   if (!rows.length) return;
@@ -41,6 +67,51 @@ async function upsert(table, rows, conflictColumn) {
     throw new Error(`${table}: HTTP ${response.status} — ${await response.text()}`);
   }
   console.log(`${table}: ${rows.length} registro(s) importado(s)`);
+}
+
+async function importUsers() {
+  const users = localUsers();
+  const page = await supabaseRequest('/auth/v1/admin/users?per_page=1000&page=1');
+  const existing = Array.isArray(page.users) ? page.users : [];
+
+  for (const user of users) {
+    let authUser = existing.find(item => item.email?.toLowerCase() === user.email.toLowerCase());
+    const userMetadata = {
+      legacy_id: user.id,
+      role: user.role,
+      status: user.status
+    };
+
+    if (!authUser) {
+      authUser = await supabaseRequest('/auth/v1/admin/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: user.email,
+          password_hash: user.password,
+          email_confirm: true,
+          user_metadata: userMetadata
+        })
+      });
+    } else {
+      authUser = await supabaseRequest(`/auth/v1/admin/users/${authUser.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({email_confirm: true, user_metadata: userMetadata})
+      });
+    }
+
+    const authId = authUser.id || authUser.user?.id;
+    if (!authId) throw new Error(`Não foi possível obter o ID Auth de ${user.email}`);
+
+    await upsert('profiles', [{
+      id: authId,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      legacy_id: user.id,
+      created_at: user.created_at
+    }], 'id');
+    console.log(`auth: ${user.email}`);
+  }
 }
 
 async function main() {
@@ -67,6 +138,8 @@ async function main() {
     key,
     value
   })), 'key');
+
+  await importUsers();
 }
 
 main().catch(error => {
