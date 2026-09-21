@@ -403,14 +403,22 @@ switch ($action) {
             echo json_encode(['error' => 'A senha temporaria deve ter pelo menos 6 caracteres.']);
             break;
         }
+        // O endpoint de listagem ignora o filtro ?email=; busca exata no PHP
+        // para nunca tocar em outro usuário por engano.
         $lookup = supabaseRequest(
             'GET',
-            '/auth/v1/admin/users?email=' . rawurlencode($email),
+            '/auth/v1/admin/users?per_page=1000',
             null,
             null,
             $supabaseServiceKey
         );
-        $existing = $lookup['body']['users'][0] ?? null;
+        $existing = null;
+        foreach (($lookup['body']['users'] ?? []) as $candidate) {
+            if (strtolower($candidate['email'] ?? '') === $email) {
+                $existing = $candidate;
+                break;
+            }
+        }
         $authWrite = $existing
             ? supabaseRequest(
                 'PUT',

@@ -73,7 +73,6 @@ function supabaseRequest($method, $endpoint, $body = null, $bearerToken = null, 
     $raw = curl_exec($curl);
     $curlError = curl_error($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-    curl_close($curl);
 
     if ($raw === false) {
         return ['status' => 0, 'body' => ['error' => $curlError ?: 'Supabase request failed.']];

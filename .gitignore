@@ -11,3 +11,5 @@
 .env
 .env.local
 /api/config.local.json
+.vercel
+.env*
