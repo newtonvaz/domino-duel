@@ -141,7 +141,8 @@ switch ($action) {
             'id' => $auth['body']['user']['id'],
             'email' => $input['email'],
             'role' => 'user',
-            'status' => 'pending'
+            'status' => 'pending',
+            'password_change_required' => true
         ];
         $profileWrite = supabaseRequest(
             'POST',
@@ -215,10 +216,55 @@ switch ($action) {
             'ok' => true,
             'email' => $user['email'],
             'role' => $user['role'],
+            'password_change_required' => !empty($user['password_change_required']),
             'access_token' => $auth['body']['access_token'] ?? null,
             'refresh_token' => $auth['body']['refresh_token'] ?? null,
             'expires_in' => $auth['body']['expires_in'] ?? null
         ]);
+        break;
+
+    case 'completeFirstAccessPasswordChange':
+        $profile = requireSupabaseApprovedUser();
+        if (!$profile) break;
+        $input = jsonInput();
+        $password = (string) ($input['password'] ?? '');
+        if (strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A nova senha deve ter pelo menos 6 caracteres.']);
+            break;
+        }
+        $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (!preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Sessão inválida.']);
+            break;
+        }
+        $authUpdate = supabaseRequest(
+            'PUT',
+            '/auth/v1/user',
+            ['password' => $password],
+            $matches[1],
+            $supabasePublishableKey
+        );
+        if ($authUpdate['status'] < 200 || $authUpdate['status'] >= 300) {
+            http_response_code(400);
+            echo json_encode(['error' => $authUpdate['body']['message'] ?? 'Não foi possível alterar a senha.']);
+            break;
+        }
+        $profileUpdate = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
+            ['password_change_required' => false, 'password_reset_offered' => true],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        if ($profileUpdate['status'] < 200 || $profileUpdate['status'] >= 300) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Senha alterada, mas não foi possível concluir o primeiro acesso.']);
+            break;
+        }
+        echo json_encode(['ok' => true]);
         break;
 
     case 'session':
@@ -228,7 +274,12 @@ switch ($action) {
             echo json_encode(['error' => 'Sessão inválida.']);
             break;
         }
-        echo json_encode(['ok' => true, 'email' => $profile['email'], 'role' => $profile['role']]);
+        echo json_encode([
+            'ok' => true,
+            'email' => $profile['email'],
+            'role' => $profile['role'],
+            'password_change_required' => !empty($profile['password_change_required'])
+        ]);
         break;
 
     case 'logout':

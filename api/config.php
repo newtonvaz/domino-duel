@@ -76,7 +76,7 @@ function supabaseCurrentProfile() {
     $id = rawurlencode($auth['body']['id']);
     $profiles = supabaseRequest(
         'GET',
-        '/rest/v1/profiles?select=id,email,role,status,created_at&id=eq.' . $id . '&limit=1',
+        '/rest/v1/profiles?select=id,email,role,status,password_change_required,created_at&id=eq.' . $id . '&limit=1',
         null,
         $token,
         $supabasePublishableKey
@@ -91,7 +91,7 @@ function supabaseProfileById($id, $bearerToken = null) {
     $apiKey = $bearerToken ? $supabasePublishableKey : $supabaseServiceKey;
     $response = supabaseRequest(
         'GET',
-        '/rest/v1/profiles?select=id,email,role,status,created_at&id=eq.' . rawurlencode($id) . '&limit=1',
+        '/rest/v1/profiles?select=id,email,role,status,password_change_required,created_at&id=eq.' . rawurlencode($id) . '&limit=1',
         null,
         $bearerToken,
         $apiKey
