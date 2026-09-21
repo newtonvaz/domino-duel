@@ -95,7 +95,11 @@ async function importUsers() {
     } else {
       authUser = await supabaseRequest(`/auth/v1/admin/users/${authUser.id}`, {
         method: 'PUT',
-        body: JSON.stringify({email_confirm: true, user_metadata: userMetadata})
+        body: JSON.stringify({
+          email_confirm: true,
+          password_hash: user.password,
+          user_metadata: userMetadata
+        })
       });
     }
 
