@@ -176,7 +176,7 @@ switch ($action) {
                 break;
             }
             $profile = supabaseProfileByEmail($input['email'] ?? '');
-            if ($profile && empty($profile['password_reset_offered'])) {
+            if ($profile && !empty($profile['password_change_required']) && empty($profile['password_reset_offered'])) {
                 $marked = supabaseRequest(
                     'PATCH',
                     '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
