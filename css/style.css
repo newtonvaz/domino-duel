@@ -177,6 +177,9 @@ body.is-user .nav-btn.role-hidden{display:flex;}
 body.is-admin .admin-only{display:inherit;}
 body.is-admin .admin-only.flex{display:flex;}
 body.is-admin .nav-btn.admin-only{display:flex;}
+body.is-admin .admin-only.access-menu-item{display:flex;}
+.icon-lock{mask:var(--icon-lock) center/contain no-repeat;-webkit-mask:var(--icon-lock) center/contain no-repeat;}
+:root{--icon-lock:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M17 8h-1V6a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2m-7-2a2 2 0 0 1 4 0v2h-4zm5 12H9v-2h6zm-1.5-4h-3v-2h3z'/%3E%3C/svg%3E");}
 
 .player-card{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:10px;}
 .avatar{border-radius:50%;object-fit:cover;flex-shrink:0;}

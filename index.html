@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="152x152" href="icons/logo-domino-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/logo-domino-192.png">
 <link rel="apple-touch-icon" href="icons/logo-domino-192.png">
-<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/style.css?v=20">
 </head>
 <body>
 <div class="app-shell">
@@ -62,15 +62,6 @@
         <button class="shortcut-card" onclick="showView('ranking')"><span class="shortcut-icon icon-chart"></span><span><b>Estatísticas</b><small>Ranking e desempenho</small></span><span class="chevron">›</span></button>
       </div>
 
-      <div class="admin-only" id="pendingSection" style="margin-top:14px;">
-        <h2 class="section-title" style="font-size:18px;">Novos usuários</h2>
-        <div class="card" id="pendingUsersList"></div>
-      </div>
-
-      <div class="admin-only" id="usersSection" style="margin-top:14px;">
-        <h2 class="section-title" style="font-size:18px;">Gerenciar acessos</h2>
-        <div class="card" id="usersList"></div>
-      </div>
     </section>
 
     <!-- MORE -->
@@ -79,6 +70,22 @@
       <div class="more-menu">
         <button class="shortcut-card" onclick="showView('ranking')"><span class="shortcut-icon icon-chart"></span><span><b>Estatísticas</b><small>Ranking e desempenho das duplas</small></span><span class="chevron">›</span></button>
         <button class="shortcut-card" onclick="showView('players')"><span class="shortcut-icon icon-more"></span><span><b>Jogadores</b><small>Gerencie os participantes da mesa</small></span><span class="chevron">›</span></button>
+        <button class="shortcut-card admin-only access-menu-item" onclick="showView('access')"><span class="shortcut-icon icon-lock"></span><span><b>Gerenciar acesso</b><small>Aprove, bloqueie ou remova usuários</small></span><span class="chevron">›</span></button>
+      </div>
+    </section>
+
+    <!-- ACCESS MANAGEMENT -->
+    <section class="view" id="view-access">
+      <div class="view-heading"><h2 class="section-title">Gerenciar acesso</h2><p>CONTROLE EXCLUSIVO DO ADMINISTRADOR</p></div>
+
+      <div id="pendingSection" style="margin-top:14px;">
+        <h2 class="section-title" style="font-size:18px;">Novos usuários</h2>
+        <div class="card" id="pendingUsersList"></div>
+      </div>
+
+      <div id="usersSection" style="margin-top:24px;">
+        <h2 class="section-title" style="font-size:18px;">Usuários cadastrados</h2>
+        <div class="card" id="usersList"></div>
       </div>
     </section>
 
@@ -222,7 +229,7 @@
 </div>
 </div>
 
-<script src="js/app.js?v=28"></script>
+<script src="js/app.js?v=29"></script>
 <script>
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {

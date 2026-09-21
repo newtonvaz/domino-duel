@@ -193,8 +193,14 @@ switch ($action) {
             echo json_encode(['error' => 'Seu cadastro foi rejeitado.']);
             break;
         }
+        if ($user['status'] === 'blocked') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seu acesso está bloqueado. Procure um administrador.']);
+            break;
+        }
         echo json_encode([
             'ok' => true,
+            'id' => $user['id'],
             'email' => $user['email'],
             'role' => $user['role'],
             'password_change_required' => !empty($user['password_change_required']),
@@ -280,6 +286,7 @@ switch ($action) {
         }
         echo json_encode([
             'ok' => true,
+            'id' => $profile['id'],
             'email' => $profile['email'],
             'role' => $profile['role'],
             'password_change_required' => !empty($profile['password_change_required'])
@@ -323,6 +330,47 @@ switch ($action) {
             'PATCH',
             '/rest/v1/profiles?id=eq.' . rawurlencode($input['id'] ?? ''),
             ['status' => 'rejected'],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
+        break;
+
+    case 'blockUser':
+        $input = jsonInput();
+        $admin = requireSupabaseAdmin();
+        if (!$admin) break;
+        $id = trim((string) ($input['id'] ?? ''));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $id === $admin['id']) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Não é possível bloquear este usuário.']);
+            break;
+        }
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($id),
+            ['status' => 'blocked'],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
+        break;
+
+    case 'unblockUser':
+        $input = jsonInput();
+        if (!requireSupabaseAdmin()) break;
+        $id = trim((string) ($input['id'] ?? ''));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Usuário inválido.']);
+            break;
+        }
+        $response = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($id),
+            ['status' => 'approved'],
             null,
             $supabaseServiceKey,
             ['Prefer: return=minimal']
@@ -466,9 +514,15 @@ switch ($action) {
 
     case 'deleteUser':
         $input = jsonInput();
-        if (!requireSupabaseAdmin()) break;
-        $id = rawurlencode($input['id'] ?? '');
-        $response = supabaseRequest('DELETE', '/auth/v1/admin/users/' . $id, null, null, $supabaseServiceKey);
+        $admin = requireSupabaseAdmin();
+        if (!$admin) break;
+        $id = trim((string) ($input['id'] ?? ''));
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id) || $id === $admin['id']) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Não é possível apagar este usuário.']);
+            break;
+        }
+        $response = supabaseRequest('DELETE', '/auth/v1/admin/users/' . rawurlencode($id), null, null, $supabaseServiceKey);
         echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 

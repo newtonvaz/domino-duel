@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'blocked')),
   password_reset_offered BOOLEAN NOT NULL DEFAULT FALSE,
   password_change_required BOOLEAN NOT NULL DEFAULT TRUE,
   legacy_id INTEGER UNIQUE,
@@ -16,6 +16,12 @@ ALTER TABLE public.profiles
 
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS password_change_required BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Permite bloquear e desbloquear acessos sem apagar a conta.
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_status_check;
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_status_check
+  CHECK (status IN ('pending', 'approved', 'rejected', 'blocked'));
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 

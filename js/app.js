@@ -410,15 +410,17 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
 });
 function showView(id){
   if(id==='match' && !user) return;
+  if(id==='access' && (!user || user.role !== 'admin')) return;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
-  const selectedNav = (id === 'ranking' || id === 'players') ? 'more' : id;
+  const selectedNav = (id === 'ranking' || id === 'players' || id === 'access') ? 'more' : id;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===selectedNav));
   if(id==='home') renderHome();
   if(id==='players') renderPlayers();
   if(id==='match') renderMatchSetup();
   if(id==='history'){ updateHistoryTabs(); renderHistory(); }
   if(id==='ranking') renderRanking();
+  if(id==='access') renderPendingUsers();
 }
 
 /* ---------- ADMIN (API) ---------- */
@@ -437,7 +439,7 @@ async function checkSession(){
       updateAuthUI();
       return;
     }
-    user = {email: session.email, role: session.role};
+    user = {id: session.id, email: session.email, role: session.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
   } else {
     user = null;
@@ -525,15 +527,12 @@ async function submitLogin(){
       shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
       return;
     }
-    user = {email: res.email, role: res.role};
+    user = {id: res.id, email: res.email, role: res.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
     updateAuthUI();
     closeAdminModal();
     renderPlayers();
     startPolling();
-    if(res.role === 'admin'){
-      renderPendingUsers();
-    }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
     shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
@@ -695,12 +694,50 @@ function shakeElement(el){
 }
 
 async function approveUser(id){
+  if(!user || user.role !== 'admin') return;
   await api('approveUser', {id});
   renderPendingUsers();
 }
 
 async function rejectUser(id){
+  if(!user || user.role !== 'admin') return;
   await api('rejectUser', {id});
+  renderPendingUsers();
+}
+
+async function blockUser(id, encodedEmail){
+  if(!user || user.role !== 'admin') return;
+  const email = decodeURIComponent(encodedEmail || '');
+  if(!window.confirm(`Bloquear o acesso de ${email}?`)) return;
+  const response = await api('blockUser', {id});
+  if(!(response && response.ok)){
+    window.alert((response && response.error) || 'Não foi possível bloquear o usuário.');
+    return;
+  }
+  renderPendingUsers();
+}
+
+async function unblockUser(id, encodedEmail){
+  if(!user || user.role !== 'admin') return;
+  const email = decodeURIComponent(encodedEmail || '');
+  if(!window.confirm(`Desbloquear o acesso de ${email}?`)) return;
+  const response = await api('unblockUser', {id});
+  if(!(response && response.ok)){
+    window.alert((response && response.error) || 'Não foi possível desbloquear o usuário.');
+    return;
+  }
+  renderPendingUsers();
+}
+
+async function deleteUser(id, encodedEmail){
+  if(!user || user.role !== 'admin') return;
+  const email = decodeURIComponent(encodedEmail || '');
+  if(!window.confirm(`Apagar definitivamente a conta de ${email}? Esta ação não pode ser desfeita.`)) return;
+  const response = await api('deleteUser', {id});
+  if(!(response && response.ok)){
+    window.alert((response && response.error) || 'Não foi possível apagar o usuário.');
+    return;
+  }
   renderPendingUsers();
 }
 
@@ -763,6 +800,7 @@ async function refreshFromServer(){
         case 'players': renderPlayers(); break;
         case 'history': renderHistory(); break;
         case 'ranking': renderRanking(); break;
+        case 'access': renderPendingUsers(); break;
       }
     }
   })();
@@ -778,7 +816,9 @@ function startPolling(){
   pollTimer = setInterval(async () => {
     if(document.hidden) return;
     await refreshFromServer();
-    renderPendingUsers();
+    if(user && user.role === 'admin' && document.getElementById('view-access')?.classList.contains('active')){
+      renderPendingUsers();
+    }
     if (isSyncNeeded()) retrySync();
   }, POLL_INTERVAL_MS);
 }
@@ -797,7 +837,6 @@ function renderHome(){
   const recent = [...data.matches].sort(compareMatchDesc).slice(0,5);
   if(recent.length===0){
     wrap.innerHTML = `<div class="empty-state" style="padding:16px 6px;"><p>Nenhuma partida registrada ainda.</p></div>`;
-    renderPendingUsers();
     return;
   }
   wrap.innerHTML = recent.map(m=>{
@@ -808,15 +847,17 @@ function renderHome(){
       <span class="score">${m.scoreA}x${m.scoreB}</span>
     </div>`;
   }).join('');
-  renderPendingUsers();
 }
 
 function renderPendingUsers(){
   const sec = document.getElementById('pendingSection');
   const list = document.getElementById('pendingUsersList');
-  if(!sec || !list) return;
+  const usersSection = document.getElementById('usersSection');
+  const usersList = document.getElementById('usersList');
+  if(!sec || !list || !usersSection || !usersList) return;
   if(!user || user.role !== 'admin'){
     sec.style.display = 'none';
+    usersSection.style.display = 'none';
     return;
   }
   api('listUsers').then(res => {
@@ -837,16 +878,35 @@ function renderPendingUsers(){
       `).join('');
     }
 
-    const usersSection = document.getElementById('usersSection');
-    const usersList = document.getElementById('usersList');
-    const approved = res.filter(u => u.status === 'approved');
+    const managed = res.filter(u => u.status !== 'pending');
     usersSection.style.display = 'block';
-    usersList.innerHTML = approved.length ? approved.map(u => `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
-        <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:var(--text-muted);">${u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'}</small></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodeURIComponent(u.email).replace(/'/g, '%27')}')">Forçar troca</button></div>
-      </div>
-    `).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário aprovado.</p></div>';
+    usersList.innerHTML = managed.length ? managed.map(u => {
+      const encodedEmail = encodeURIComponent(u.email).replace(/'/g, '%27');
+      const isSelf = u.id === (user && user.id);
+      const statusLabel = u.status === 'blocked'
+        ? 'Bloqueado'
+        : (u.status === 'rejected' ? 'Rejeitado' : (u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'));
+      const statusColor = u.status === 'blocked' ? 'var(--red)' : 'var(--text-muted)';
+      const actions = [];
+      if(!isSelf && u.status === 'approved'){
+        actions.push(`<button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="blockUser('${u.id}','${encodedEmail}')">Bloquear</button>`);
+      }
+      if(!isSelf && u.status === 'blocked'){
+        actions.push(`<button class="btn btn-primary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="unblockUser('${u.id}','${encodedEmail}')">Desbloquear</button>`);
+      }
+      if(u.status === 'approved'){
+        actions.push(`<button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')">Forçar troca</button>`);
+      }
+      if(!isSelf){
+        actions.push(`<button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;color:#f2a7a7;" onclick="deleteUser('${u.id}','${encodedEmail}')">Apagar</button>`);
+      }
+      if(!actions.length) actions.push('<small style="color:var(--text-muted);">Sua conta</small>');
+      return `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
+        <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:${statusColor};">${statusLabel}</small></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${actions.join('')}</div>
+      </div>`;
+    }).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário cadastrado.</p></div>';
   });
 }
 
