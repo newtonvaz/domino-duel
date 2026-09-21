@@ -4,7 +4,7 @@
  * Uso:
  *   SUPABASE_URL="https://seu-projeto.supabase.co" \
  *   SUPABASE_SERVICE_ROLE_KEY="sua-chave-secreta" \
- *   node tools/import_supabase.js
+ *   node tools/import_supabase.js --recreate-existing
  */
 
 const fs = require('fs');
@@ -13,6 +13,7 @@ const { execFileSync } = require('child_process');
 
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const recreateExisting = process.argv.includes('--recreate-existing');
 const root = path.resolve(__dirname, '..');
 
 if (!supabaseUrl || !serviceRoleKey) {
@@ -82,6 +83,12 @@ async function importUsers() {
       status: user.status
     };
 
+    if (authUser && recreateExisting) {
+      await supabaseRequest(`/auth/v1/admin/users/${authUser.id}`, {method: 'DELETE'});
+      console.log(`auth: recriando ${user.email}`);
+      authUser = null;
+    }
+
     if (!authUser) {
       authUser = await supabaseRequest('/auth/v1/admin/users', {
         method: 'POST',
@@ -97,7 +104,6 @@ async function importUsers() {
         method: 'PUT',
         body: JSON.stringify({
           email_confirm: true,
-          password_hash: user.password,
           user_metadata: userMetadata
         })
       });
