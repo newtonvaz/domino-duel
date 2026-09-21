@@ -6,29 +6,19 @@ const SUPABASE_URL = String(window.__SUPABASE_URL || 'https://fwldefyksaltfvdhwd
 const SUPABASE_ANON_KEY = String(window.__SUPABASE_ANON_KEY || 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
 const SUPABASE_SETTINGS_TABLE = String(window.__SUPABASE_SETTINGS_TABLE || 'settings');
 const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-const IS_NETLIFY_HOST = /(^|\.)netlify\.app$/i.test(window.location.hostname);
-const PUBLISHED_DATA_URL = window.__APP_DATA_URL || (IS_NETLIFY_HOST
-  ? new URL('data/backup.json', window.location.href).href
-  : null);
-const PUBLISHED_SETTINGS_URL = window.__APP_SETTINGS_URL || (IS_NETLIFY_HOST
-  ? new URL('data/settings.json', window.location.href).href
-  : null);
 const API_URL = window.__APP_API_URL || (window.location.protocol === 'file:'
   ? LOCAL_API_URL
   : new URL('api/index.php', window.location.href).href);
 // O fallback local é útil no desenvolvimento HTTP, mas nunca deve ser usado
 // por um site publicado: o navegador tentaria acessar o computador do usuário.
-const API_FALLBACK_URL = window.location.protocol === 'file:' || IS_NETLIFY_HOST
+const API_FALLBACK_URL = window.location.protocol === 'file:'
   ? null
   : LOCAL_API_URL;
-const PUBLISHED_READ_ONLY = (IS_NETLIFY_HOST || !!window.__APP_DATA_URL) && !window.__APP_API_URL;
 const STORAGE_KEY = 'duelo_domino_data_v1';
 const APP_TIMEZONE = 'America/Recife';
 let data = {players:[], matches:[], settings:{}};
-let publishedDataPromise = null;
 
 const SUPABASE_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
-const PUBLISHED_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
 
 async function supabaseRequest(table, query){
   const params = new URLSearchParams(query || {});
@@ -101,43 +91,6 @@ function hasSupabaseData(action, value){
   return Array.isArray(value) && value.length > 0;
 }
 
-async function publishedData(){
-  if(!PUBLISHED_DATA_URL) return null;
-  if(!publishedDataPromise){
-    const request = (async () => {
-      const [dataRes, settingsRes] = await Promise.all([
-        fetch(PUBLISHED_DATA_URL, {cache: 'no-store'}),
-        PUBLISHED_SETTINGS_URL
-          ? fetch(PUBLISHED_SETTINGS_URL, {cache: 'no-store'})
-          : Promise.resolve(null)
-      ]);
-      if(!dataRes.ok) throw new Error(`Dados publicados indisponíveis (HTTP ${dataRes.status})`);
-      const backup = await dataRes.json();
-      let settings = {};
-      if(settingsRes && settingsRes.ok){
-        try { settings = await settingsRes.json(); } catch(e) {}
-      }
-      return {backup: backup && typeof backup === 'object' ? backup : {}, settings};
-    })();
-    publishedDataPromise = request.finally(() => {
-      publishedDataPromise = null;
-    });
-  }
-  return publishedDataPromise;
-}
-
-async function publishedRead(action){
-  if(!IS_NETLIFY_HOST && !window.__APP_DATA_URL) return null;
-  const published = await publishedData();
-  if(!published) return null;
-  if(action === 'listPlayers') return Array.isArray(published.backup.players) ? published.backup.players : [];
-  if(action === 'listMatches') return Array.isArray(published.backup.matches) ? published.backup.matches : [];
-  if(action === 'listSettings') return published.settings && typeof published.settings === 'object'
-    ? published.settings
-    : {};
-  return null;
-}
-
 async function api(method, body){
   if(SUPABASE_READ_ACTIONS.has(method) && SUPABASE_ENABLED){
     try{
@@ -150,15 +103,6 @@ async function api(method, body){
       console.warn('Leitura Supabase indisponível; tentando fallback:', e);
     }
   }
-  if(PUBLISHED_READ_ACTIONS.has(method) && (IS_NETLIFY_HOST || window.__APP_DATA_URL)){
-    try{
-      const published = await publishedRead(method);
-      if(published !== null) return published;
-    }catch(e){
-      console.warn('Dados publicados indisponíveis:', e);
-    }
-  }
-  if(PUBLISHED_READ_ONLY) return null;
   const endpoints = [API_URL, API_FALLBACK_URL].filter((url, i, list) => url && list.indexOf(url) === i);
   let lastError = null;
   for(const endpoint of endpoints){
@@ -224,7 +168,6 @@ async function saveData(snapshot){
     const playersSaved = playersRes && (playersRes.success === true || playersRes.ok === true);
     const matchesSaved = matchesRes && (matchesRes.success === true || matchesRes.ok === true);
     if (playersSaved && matchesSaved) {
-      await api('saveBackup', {players: playersToSave, matches: matchesToSave});
       clearSyncNeeded();
       return true;
     } else {
@@ -242,7 +185,6 @@ async function retrySync(){
   const playersRes = await api('savePlayers', {players: data.players.filter(p => p.id)});
   const matchesRes = await api('saveMatches', {matches: data.matches.filter(m => m.id)});
   if (playersRes && playersRes.ok && matchesRes && matchesRes.ok) {
-    api('saveBackup', {players: data.players, matches: data.matches});
     clearSyncNeeded();
   }
 }

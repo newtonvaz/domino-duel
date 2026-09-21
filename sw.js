@@ -40,33 +40,12 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
   const url = new URL(e.request.url);
-  if(url.pathname === '/data/backup.json' || url.pathname === '/data/settings.json') {
-    e.respondWith(networkFirstData(e.request));
-    return;
-  }
   if (url.pathname.endsWith('.json') || url.pathname.startsWith('/icons/')) {
     e.respondWith(cacheFirst(e.request));
   } else {
     e.respondWith(staleWhileRevalidate(e.request, e));
   }
 });
-
-async function networkFirstData(req) {
-  try {
-    const res = await fetch(req, {cache: 'no-store'});
-    if(res && res.ok){
-      const cache = await caches.open(CACHE);
-      await cache.put(req, res.clone());
-    }
-    return res;
-  } catch {
-    const cached = await caches.match(req, {ignoreSearch: true});
-    return cached || new Response(JSON.stringify({error: 'offline'}), {
-      status: 503,
-      headers: {'Content-Type': 'application/json'}
-    });
-  }
-}
 
 async function cacheFirst(req) {
   const cached = await caches.match(req, {ignoreSearch: true});
