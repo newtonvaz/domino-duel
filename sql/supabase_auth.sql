@@ -11,5 +11,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- O app consulta os perfis somente pelo backend, usando a chave secreta.
--- Não há policy pública de leitura ou escrita para esta tabela.
+-- Não há policy pública de leitura ou escrita; cada usuário só pode ler
+-- o próprio perfil. Operações administrativas passam pelo backend.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'profiles'
+      AND policyname = 'Users read own profile'
+  ) THEN
+    CREATE POLICY "Users read own profile" ON public.profiles
+      FOR SELECT TO authenticated USING (auth.uid() = id);
+  END IF;
+END $$;

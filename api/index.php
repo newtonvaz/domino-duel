@@ -171,7 +171,10 @@ switch ($action) {
             echo json_encode(['error' => 'E-mail ou senha incorretos.']);
             break;
         }
-        $user = supabaseProfileById($auth['body']['user']['id']);
+        $user = supabaseProfileById(
+            $auth['body']['user']['id'],
+            $auth['body']['access_token'] ?? null
+        );
         if (!$user) {
             http_response_code(403);
             echo json_encode(['error' => 'Perfil de acesso não configurado.']);

@@ -115,7 +115,7 @@ function supabaseRequest($method, $endpoint, $body = null, $bearerToken = null, 
 }
 
 function supabaseCurrentProfile() {
-    global $supabasePublishableKey, $supabaseServiceKey;
+    global $supabasePublishableKey;
     $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (!preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches)) {
         return null;
@@ -130,22 +130,23 @@ function supabaseCurrentProfile() {
         'GET',
         '/rest/v1/profiles?select=id,email,role,status,created_at&id=eq.' . $id . '&limit=1',
         null,
-        null,
-        $supabaseServiceKey
+        $token,
+        $supabasePublishableKey
     );
     return ($profiles['status'] >= 200 && $profiles['status'] < 300 && !empty($profiles['body'][0]))
         ? $profiles['body'][0]
         : null;
 }
 
-function supabaseProfileById($id) {
-    global $supabaseServiceKey;
+function supabaseProfileById($id, $bearerToken = null) {
+    global $supabasePublishableKey, $supabaseServiceKey;
+    $apiKey = $bearerToken ? $supabasePublishableKey : $supabaseServiceKey;
     $response = supabaseRequest(
         'GET',
         '/rest/v1/profiles?select=id,email,role,status,created_at&id=eq.' . rawurlencode($id) . '&limit=1',
         null,
-        null,
-        $supabaseServiceKey
+        $bearerToken,
+        $apiKey
     );
     return ($response['status'] >= 200 && $response['status'] < 300 && !empty($response['body'][0]))
         ? $response['body'][0]
