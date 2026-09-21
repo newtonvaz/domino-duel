@@ -220,6 +220,9 @@ let rankingPeriod = 'week';
 let periodOffset = 0;
 let pollTimer = null;
 let refreshPromise = null;
+let passwordChangeMode = null;
+let passwordChangeToken = null;
+let passwordChangeResolve = null;
 const POLL_INTERVAL_MS = 30000;
 const APP_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -340,14 +343,6 @@ async function checkSession(){
   }
   const session = await api('session');
   if(session && session.ok){
-    if(session.password_change_required && !(await requestFirstAccessPasswordChange())){
-      user = null;
-      localStorage.removeItem('duelo_user');
-      localStorage.removeItem('duelo_access_token');
-      localStorage.removeItem('duelo_refresh_token');
-      updateAuthUI();
-      return;
-    }
     user = {email: session.email, role: session.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
   } else {
@@ -378,17 +373,24 @@ document.getElementById('adminToggleBtn').addEventListener('click', ()=>{
 function openAdminModal(){
   document.getElementById('adminError').textContent = '';
   document.getElementById('adminRegError').textContent = '';
+  document.getElementById('adminResetError').textContent = '';
+  document.getElementById('passwordChangeError').textContent = '';
   document.getElementById('adminEmailInput').value = '';
   document.getElementById('adminPasswordInput').value = '';
+  document.getElementById('adminResetEmailInput').value = '';
   document.getElementById('adminRegEmailInput').value = '';
   document.getElementById('adminRegPasswordInput').value = '';
   document.getElementById('adminRegConfirmInput').value = '';
+  document.getElementById('passwordChangeInput').value = '';
+  document.getElementById('passwordChangeConfirmInput').value = '';
   document.getElementById('logoutBtn').style.display = 'none';
   if(user){
     document.getElementById('adminModalTitle').textContent = user.email;
     document.getElementById('adminModalSub').textContent = '';
     document.getElementById('adminLoginForm').style.display = 'none';
     document.getElementById('adminRegisterForm').style.display = 'none';
+    document.getElementById('adminPasswordResetForm').style.display = 'none';
+    document.getElementById('adminPasswordChangeForm').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'block';
   } else {
     showAdminLogin();
@@ -405,13 +407,38 @@ function closeAdminModal(){
 function showAdminLogin(){
   document.getElementById('adminLoginForm').style.display = 'block';
   document.getElementById('adminRegisterForm').style.display = 'none';
+  document.getElementById('adminPasswordResetForm').style.display = 'none';
+  document.getElementById('adminPasswordChangeForm').style.display = 'none';
   document.getElementById('adminModalTitle').textContent = 'Login do Usu\u00e1rio';
   document.getElementById('adminModalSub').textContent = 'Entre com o seu e-mail e senha ou crie uma conta.';
   document.getElementById('adminError').textContent = '';
 }
+function showPasswordReset(){
+  document.getElementById('adminPasswordResetForm').style.display = 'block';
+  document.getElementById('adminLoginForm').style.display = 'none';
+  document.getElementById('adminRegisterForm').style.display = 'none';
+  document.getElementById('adminPasswordChangeForm').style.display = 'none';
+  document.getElementById('adminModalTitle').textContent = 'Trocar senha';
+  document.getElementById('adminModalSub').textContent = 'Recupere o acesso usando seu e-mail pessoal.';
+  document.getElementById('adminResetEmailInput').value = document.getElementById('adminEmailInput').value.trim();
+  document.getElementById('adminResetError').textContent = '';
+  setTimeout(()=>document.getElementById('adminResetEmailInput').focus(), 50);
+}
+async function submitPasswordReset(){
+  const email = document.getElementById('adminResetEmailInput').value.trim();
+  const err = document.getElementById('adminResetError');
+  if(!email || !email.includes('@')){ err.textContent = 'Informe um e-mail válido.'; return; }
+  const response = await api('requestPasswordReset', {email, redirect_to: `${location.origin}${location.pathname}`});
+  err.style.color = response && response.ok ? 'var(--green)' : 'var(--red)';
+  err.textContent = response && response.ok
+    ? 'Link enviado. Confira sua caixa de entrada e spam.'
+    : ((response && response.message) || 'Não foi possível enviar o link agora.');
+}
 function showAdminRegister(){
   document.getElementById('adminLoginForm').style.display = 'none';
   document.getElementById('adminRegisterForm').style.display = 'block';
+  document.getElementById('adminPasswordResetForm').style.display = 'none';
+  document.getElementById('adminPasswordChangeForm').style.display = 'none';
   document.getElementById('adminModalTitle').textContent = 'Criar Conta Admin';
   document.getElementById('adminModalSub').textContent = 'Crie seu acesso de administrador.';
   document.getElementById('adminRegError').textContent = '';
@@ -426,13 +453,6 @@ async function submitLogin(){
   if(res && res.ok){
     if(res.access_token) localStorage.setItem('duelo_access_token', res.access_token);
     if(res.refresh_token) localStorage.setItem('duelo_refresh_token', res.refresh_token);
-    if(res.password_change_required && !(await requestFirstAccessPasswordChange())){
-      localStorage.removeItem('duelo_access_token');
-      localStorage.removeItem('duelo_refresh_token');
-      err.textContent = 'A troca de senha é obrigatória no primeiro acesso.';
-      shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
-      return;
-    }
     user = {email: res.email, role: res.role};
     localStorage.setItem('duelo_user', JSON.stringify(user));
     updateAuthUI();
@@ -444,36 +464,87 @@ async function submitLogin(){
     }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
-    if(res && res.password_reset_available){
-      const sendReset = window.confirm('A senha está incorreta. Deseja receber um link para criar uma nova senha?');
-      if(sendReset){
-        const reset = await api('requestPasswordReset', {email});
-        err.textContent = reset && reset.ok
-          ? 'Confira seu e-mail para criar uma nova senha.'
-          : ((reset && reset.message) || 'Não foi possível enviar o link de recuperação.');
-      }
-    }
     shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
   }
 }
 
-async function requestFirstAccessPasswordChange(){
-  const password = window.prompt('Primeiro acesso: crie uma nova senha (mínimo de 6 caracteres):');
-  const confirmPassword = password === null ? null : window.prompt('Confirme a nova senha:');
-  if(!password || password.length < 6 || password !== confirmPassword){
-    window.alert('As senhas não conferem ou têm menos de 6 caracteres.');
-    return false;
-  }
-  const response = await api('completeFirstAccessPasswordChange', {password});
-  if(response && response.ok){
-    window.alert('Senha alterada com sucesso.');
-    return true;
-  }
-  window.alert((response && response.error) || 'Não foi possível alterar a senha.');
-  return false;
+function openPasswordChangeForm(mode, token = null){
+  passwordChangeMode = mode;
+  passwordChangeToken = token;
+  document.getElementById('adminLoginForm').style.display = 'none';
+  document.getElementById('adminRegisterForm').style.display = 'none';
+  document.getElementById('adminPasswordResetForm').style.display = 'none';
+  document.getElementById('adminPasswordChangeForm').style.display = 'block';
+  document.getElementById('adminModalTitle').textContent = 'Criar nova senha';
+  document.getElementById('adminModalSub').textContent = '';
+  document.getElementById('passwordChangeHint').textContent = mode === 'recovery'
+    ? 'Digite a nova senha para recuperar seu acesso.'
+    : 'Digite uma nova senha para continuar.';
+  document.getElementById('passwordChangeError').textContent = '';
+  document.getElementById('passwordChangeInput').value = '';
+  document.getElementById('passwordChangeConfirmInput').value = '';
+  document.getElementById('adminModalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('passwordChangeInput').focus(), 50);
+  return new Promise(resolve => { passwordChangeResolve = resolve; });
 }
 
-async function handlePasswordRecovery(){
+function finishPasswordChange(success){
+  const resolve = passwordChangeResolve;
+  passwordChangeResolve = null;
+  passwordChangeMode = null;
+  passwordChangeToken = null;
+  document.getElementById('adminPasswordChangeForm').style.display = 'none';
+  document.getElementById('adminModalOverlay').classList.remove('open');
+  if(resolve) resolve(success);
+}
+
+function cancelPasswordChange(){
+  finishPasswordChange(false);
+}
+
+async function submitPasswordChangeForm(){
+  const password = document.getElementById('passwordChangeInput').value;
+  const confirmPassword = document.getElementById('passwordChangeConfirmInput').value;
+  const err = document.getElementById('passwordChangeError');
+  if(password.length < 6){ err.textContent = 'A nova senha deve ter pelo menos 6 caracteres.'; return; }
+  if(password !== confirmPassword){ err.textContent = 'As senhas não conferem.'; return; }
+
+  let response = null;
+  if(passwordChangeMode === 'recovery'){
+    const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${passwordChangeToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({password})
+    });
+    const payload = await authResponse.json().catch(() => ({}));
+    response = authResponse.ok ? {ok:true} : {error: payload.msg || payload.message || payload.error_description};
+    if(response.ok){
+      try{
+        await fetch(`${API_URL}?action=completePasswordRecovery`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', Authorization: `Bearer ${passwordChangeToken}`}
+        });
+      }catch(e){}
+    }
+  } else {
+    response = await api('completeFirstAccessPasswordChange', {password});
+  }
+  if(response && response.ok){
+    finishPasswordChange(true);
+    return;
+  }
+  err.textContent = (response && response.error) || 'A senha não foi aceita. Tente outra combinação.';
+}
+
+async function requestFirstAccessPasswordChange(){
+  return await openPasswordChangeForm('first-access');
+}
+
+async function handlePasswordRecoveryPromptFallback(){
   const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
   const token = params.get('access_token');
   if(params.get('type') !== 'recovery' || !token) return;
@@ -510,6 +581,18 @@ async function handlePasswordRecovery(){
   }
 }
 
+// Password recovery uses the same typed form as first-access changes.
+async function handlePasswordRecovery(){
+  const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  const token = params.get('access_token');
+  if(params.get('type') !== 'recovery' || !token) return;
+  const changed = await openPasswordChangeForm('recovery', token);
+  if(changed){
+    window.alert('Senha criada com sucesso. Agora faça login.');
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
 async function submitRegister(){
   const email = document.getElementById('adminRegEmailInput').value.trim();
   const pass = document.getElementById('adminRegPasswordInput').value;
@@ -517,7 +600,7 @@ async function submitRegister(){
   const err = document.getElementById('adminRegError');
   if(!email || !pass || !confirm){ err.textContent = 'Preencha todos os campos.'; return; }
   if(!email.includes('@')){ err.textContent = 'Informe um e-mail v\u00e1lido.'; return; }
-  if(pass.length < 4){ err.textContent = 'Senha deve ter ao menos 4 caracteres.'; return; }
+  if(pass.length < 6){ err.textContent = 'Senha deve ter ao menos 6 caracteres.'; return; }
   if(pass !== confirm){ err.textContent = 'Senhas n\u00e3o conferem.'; return; }
   const res = await api('register', {email, password: pass});
   if(res && res.ok){

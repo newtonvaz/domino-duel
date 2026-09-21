@@ -1,6 +1,11 @@
 AddType application/manifest+json json
 AddType image/png png
 
+# Never expose server credentials used by the Supabase API.
+<FilesMatch "^\.env(?:\..*)?$">
+  Require all denied
+</FilesMatch>
+
 # Prevent caching of service worker, manifest, and main index.html to allow instant updates
 <FilesMatch "^(sw\.js|manifest\.json|index\.html)$">
   <IfModule mod_headers.c>

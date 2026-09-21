@@ -13,6 +13,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 }
 
 $action = $_GET['action'] ?? '';
+
+// Shared hosting environments often do not expose .env through getenv().
+// Load it only on the server; never send these values to the browser.
+function loadDotEnv($path) {
+    if (!is_readable($path)) return;
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) continue;
+        [$name, $value] = explode('=', $line, 2);
+        $name = trim($name);
+        $value = trim($value);
+        if ($value !== '' && (($value[0] === '"' && substr($value, -1) === '"') || ($value[0] === "'" && substr($value, -1) === "'"))) {
+            $value = substr($value, 1, -1);
+        }
+        if ($name !== '' && getenv($name) === false) {
+            putenv($name . '=' . $value);
+        }
+    }
+}
+
+loadDotEnv(__DIR__ . '/../.env');
+
 $supabaseUrl = rtrim((string) (getenv('SUPABASE_URL') ?: 'https://fwldefyksaltfvdhwdfi.supabase.co'), '/');
 $supabasePublishableKey = (string) (getenv('SUPABASE_PUBLISHABLE_KEY') ?: getenv('SUPABASE_ANON_KEY') ?: 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
 $supabaseServiceKey = (string) (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: getenv('SUPABASE_SECRET_KEY') ?: '');

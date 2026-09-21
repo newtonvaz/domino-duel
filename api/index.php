@@ -170,30 +170,6 @@ switch ($action) {
             $supabasePublishableKey
         );
         if ($auth['status'] < 200 || $auth['status'] >= 300 || empty($auth['body']['user']['id'])) {
-            if ($supabaseServiceKey === '') {
-                http_response_code(500);
-                echo json_encode(['error' => 'A recuperação do primeiro acesso precisa da SUPABASE_SECRET_KEY configurada no servidor.']);
-                break;
-            }
-            $profile = supabaseProfileByEmail($input['email'] ?? '');
-            if ($profile && !empty($profile['password_change_required']) && empty($profile['password_reset_offered'])) {
-                $marked = supabaseRequest(
-                    'PATCH',
-                    '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
-                    ['password_reset_offered' => true],
-                    null,
-                    $supabaseServiceKey,
-                    ['Prefer: return=minimal']
-                );
-                if ($marked['status'] >= 200 && $marked['status'] < 300) {
-                    http_response_code(401);
-                    echo json_encode([
-                        'error' => 'Senha incorreta. Deseja receber um link para criar uma nova senha?',
-                        'password_reset_available' => true
-                    ]);
-                    break;
-                }
-            }
             http_response_code(401);
             echo json_encode(['error' => 'E-mail ou senha incorretos.']);
             break;
@@ -317,15 +293,21 @@ switch ($action) {
     case 'requestPasswordReset':
         $input = jsonInput();
         $email = strtolower(trim((string) ($input['email'] ?? '')));
-        $profile = supabaseProfileByEmail($email);
-        if (!$profile || empty($profile['password_reset_offered'])) {
-            echo json_encode(['ok' => false, 'message' => 'Não foi possível solicitar a recuperação.']);
-            break;
+        $resetBody = ['email' => $email];
+        $redirectTo = trim((string) ($input['redirect_to'] ?? ''));
+        // Accept only an absolute HTTP(S) URL from the current app origin.
+        // This keeps recovery links from becoming an open redirect.
+        if ($redirectTo !== '' && filter_var($redirectTo, FILTER_VALIDATE_URL)) {
+            $redirectHost = parse_url($redirectTo, PHP_URL_HOST);
+            $requestHost = preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? ''));
+            if ($redirectHost && $requestHost && strcasecmp($redirectHost, $requestHost) === 0) {
+                $resetBody['redirect_to'] = $redirectTo;
+            }
         }
         $reset = supabaseRequest(
             'POST',
             '/auth/v1/recover',
-            ['email' => $email],
+            $resetBody,
             null,
             $supabasePublishableKey
         );
