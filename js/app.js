@@ -93,6 +93,14 @@ async function supabaseRead(action){
   return null;
 }
 
+function hasSupabaseData(action, value){
+  if(action === 'listSettings'){
+    return !!value && typeof value === 'object' && !Array.isArray(value)
+      && Object.keys(value).length > 0;
+  }
+  return Array.isArray(value) && value.length > 0;
+}
+
 async function publishedData(){
   if(!PUBLISHED_DATA_URL) return null;
   if(!publishedDataPromise){
@@ -134,7 +142,10 @@ async function api(method, body){
   if(SUPABASE_READ_ACTIONS.has(method) && SUPABASE_ENABLED){
     try{
       const supabase = await supabaseRead(method);
-      if(supabase !== null) return supabase;
+      // Uma resposta vazia pode significar projeto/tabela sem dados ou RLS
+      // sem policy de leitura. Nesse caso, permita usar o backup/API local.
+      if(supabase !== null && hasSupabaseData(method, supabase)) return supabase;
+      if(supabase !== null) console.warn(`Supabase ${method} retornou vazio; tentando fallback.`);
     }catch(e){
       console.warn('Leitura Supabase indisponível; tentando fallback:', e);
     }
