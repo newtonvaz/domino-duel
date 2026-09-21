@@ -167,6 +167,25 @@ switch ($action) {
             $supabasePublishableKey
         );
         if ($auth['status'] < 200 || $auth['status'] >= 300 || empty($auth['body']['user']['id'])) {
+            $profile = supabaseProfileByEmail($input['email'] ?? '');
+            if ($profile && empty($profile['password_reset_offered'])) {
+                $marked = supabaseRequest(
+                    'PATCH',
+                    '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
+                    ['password_reset_offered' => true],
+                    null,
+                    $supabaseServiceKey,
+                    ['Prefer: return=minimal']
+                );
+                if ($marked['status'] >= 200 && $marked['status'] < 300) {
+                    http_response_code(401);
+                    echo json_encode([
+                        'error' => 'Senha incorreta. Deseja receber um link para criar uma nova senha?',
+                        'password_reset_available' => true
+                    ]);
+                    break;
+                }
+            }
             http_response_code(401);
             echo json_encode(['error' => 'E-mail ou senha incorretos.']);
             break;
@@ -212,6 +231,27 @@ switch ($action) {
 
     case 'logout':
         echo json_encode(['ok' => true]);
+        break;
+
+    case 'requestPasswordReset':
+        $input = jsonInput();
+        $email = strtolower(trim((string) ($input['email'] ?? '')));
+        $profile = supabaseProfileByEmail($email);
+        if (!$profile || empty($profile['password_reset_offered'])) {
+            echo json_encode(['ok' => false, 'message' => 'Não foi possível solicitar a recuperação.']);
+            break;
+        }
+        $reset = supabaseRequest(
+            'POST',
+            '/auth/v1/recover',
+            ['email' => $email],
+            null,
+            $supabasePublishableKey
+        );
+        echo json_encode([
+            'ok' => $reset['status'] >= 200 && $reset['status'] < 300,
+            'message' => 'Se o e-mail estiver cadastrado, o link de recuperação será enviado.'
+        ]);
         break;
 
     case 'listUsers':

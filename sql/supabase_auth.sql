@@ -5,9 +5,13 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email TEXT NOT NULL UNIQUE,
   role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  password_reset_offered BOOLEAN NOT NULL DEFAULT FALSE,
   legacy_id INTEGER UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS password_reset_offered BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 

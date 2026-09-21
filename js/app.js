@@ -478,7 +478,44 @@ async function submitLogin(){
     }
   } else {
     err.textContent = (res && res.error) || 'E-mail ou senha incorretos.';
+    if(res && res.password_reset_available){
+      const sendReset = window.confirm('A senha está incorreta. Deseja receber um link para criar uma nova senha?');
+      if(sendReset){
+        const reset = await api('requestPasswordReset', {email});
+        err.textContent = reset && reset.ok
+          ? 'Confira seu e-mail para criar uma nova senha.'
+          : ((reset && reset.message) || 'Não foi possível enviar o link de recuperação.');
+      }
+    }
     shakeElement(document.getElementById('adminModalOverlay').querySelector('.modal-box'));
+  }
+}
+
+async function handlePasswordRecovery(){
+  const params = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+  const token = params.get('access_token');
+  if(params.get('type') !== 'recovery' || !token) return;
+
+  const password = window.prompt('Digite sua nova senha (mínimo de 6 caracteres):');
+  const confirmPassword = password === null ? null : window.prompt('Confirme sua nova senha:');
+  if(!password || password.length < 6 || password !== confirmPassword){
+    window.alert('As senhas não conferem ou têm menos de 6 caracteres.');
+    return;
+  }
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({password})
+  });
+  if(response.ok){
+    window.alert('Senha criada com sucesso. Agora faça login.');
+    history.replaceState(null, '', location.pathname + location.search);
+  } else {
+    window.alert('Não foi possível criar a nova senha. Solicite outro link.');
   }
 }
 
@@ -1455,6 +1492,7 @@ function renderRanking(){
 (async function init(){
   loadLocal();
   modoBuchuda = localStorage.getItem('modo_buchuda') === '1';
+  await handlePasswordRecovery();
   await checkSession();
   updateBuchudaUI();
   renderHome();

@@ -19,7 +19,7 @@ $supabaseServiceKey = (string) (getenv('SUPABASE_SERVICE_ROLE_KEY') ?: getenv('S
 $noDbActions = [
     'checkAppJs', 'saveSettings', 'listSettings', 'saveBackup', 'listBackup',
     'login', 'register', 'session', 'logout', 'listUsers', 'approveUser',
-    'rejectUser', 'updateUserRole', 'deleteUser'
+    'rejectUser', 'updateUserRole', 'deleteUser', 'requestPasswordReset'
 ];
 
 if (!in_array($action, $noDbActions)) {
@@ -147,6 +147,20 @@ function supabaseProfileById($id, $bearerToken = null) {
         null,
         $bearerToken,
         $apiKey
+    );
+    return ($response['status'] >= 200 && $response['status'] < 300 && !empty($response['body'][0]))
+        ? $response['body'][0]
+        : null;
+}
+
+function supabaseProfileByEmail($email) {
+    global $supabaseServiceKey;
+    $response = supabaseRequest(
+        'GET',
+        '/rest/v1/profiles?select=id,email,role,status,password_reset_offered&email=eq.' . rawurlencode(strtolower(trim($email))) . '&limit=1',
+        null,
+        null,
+        $supabaseServiceKey
     );
     return ($response['status'] >= 200 && $response['status'] < 300 && !empty($response['body'][0]))
         ? $response['body'][0]
