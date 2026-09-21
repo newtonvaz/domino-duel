@@ -1,9 +1,9 @@
 /* ---------- DATA SOURCES (Supabase + fallbacks) ---------- */
 const LOCAL_API_URL = 'http://127.0.0.1:8765/api/index.php';
 // O anon/publishable key pode aparecer no frontend; nunca use a service_role key.
-// Estes valores mantêm compatibilidade com o projeto Supabase usado originalmente.
-const SUPABASE_URL = String(window.__SUPABASE_URL || 'https://wwwntppaulmtmkmmezzt.supabase.co').replace(/\/+$/, '');
-const SUPABASE_ANON_KEY = String(window.__SUPABASE_ANON_KEY || 'sb_publishable_lrXwCVybnHQSMHWH01lANg_S6OtDEtY');
+// A publishable/anon key pode aparecer no frontend; nunca use a service_role key.
+const SUPABASE_URL = String(window.__SUPABASE_URL || 'https://fwldefyksaltfvdhwdfi.supabase.co').replace(/\/+$/, '');
+const SUPABASE_ANON_KEY = String(window.__SUPABASE_ANON_KEY || 'sb_publishable_sJp0S2rwqiaIqF6XnjWO7A_saKSK3m5');
 const SUPABASE_SETTINGS_TABLE = String(window.__SUPABASE_SETTINGS_TABLE || 'settings');
 const SUPABASE_ENABLED = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const IS_NETLIFY_HOST = /(^|\.)netlify\.app$/i.test(window.location.hostname);
@@ -50,6 +50,17 @@ async function supabaseRequest(table, query){
   return await res.json();
 }
 
+function supabaseTeam(value){
+  if(Array.isArray(value)) return value;
+  if(typeof value === 'string'){
+    try{
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){}
+  }
+  return [];
+}
+
 async function supabaseRead(action){
   if(!SUPABASE_ENABLED) return null;
   if(action === 'listPlayers'){
@@ -59,10 +70,16 @@ async function supabaseRead(action){
     });
   }
   if(action === 'listMatches'){
-    return await supabaseRequest('matches', {
+    const rows = await supabaseRequest('matches', {
       select: 'id,date,team_a,team_b,score_a,score_b,winner,buchuda,buchuda_de_re,duration_sec',
       order: 'date.desc,id.desc'
     });
+    // O dump atual usa TEXT com JSON; o schema original usa TEXT[].
+    return rows.map(row => ({
+      ...row,
+      team_a: supabaseTeam(row.team_a),
+      team_b: supabaseTeam(row.team_b)
+    }));
   }
   if(action === 'listSettings'){
     const rows = await supabaseRequest(SUPABASE_SETTINGS_TABLE, {
