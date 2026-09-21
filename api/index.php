@@ -377,6 +377,38 @@ switch ($action) {
         echo json_encode(['ok' => $response['status'] >= 200 && $response['status'] < 300]);
         break;
 
+    case 'resetUserPassword':
+        if (!requireSupabaseAdmin()) break;
+        $input = jsonInput();
+        $id = (string) ($input['id'] ?? '');
+        $password = (string) ($input['password'] ?? '');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $id)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Usuário inválido.']);
+            break;
+        }
+        if (strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode(['error' => 'A nova senha deve ter pelo menos 6 caracteres.']);
+            break;
+        }
+        $response = supabaseRequest(
+            'PUT',
+            '/auth/v1/admin/users/' . rawurlencode($id),
+            ['password' => $password],
+            null,
+            $supabaseServiceKey
+        );
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            http_response_code($response['status'] === 0 ? 500 : 400);
+            echo json_encode([
+                'error' => $response['body']['msg'] ?? $response['body']['message'] ?? 'Não foi possível redefinir a senha.'
+            ]);
+            break;
+        }
+        echo json_encode(['ok' => true]);
+        break;
+
     case 'deleteUser':
         $input = jsonInput();
         if (!requireSupabaseAdmin()) break;

@@ -121,7 +121,7 @@ async function api(method, body){
         // Login/registro precisam devolver ao chamador os detalhes do backend
         // mesmo quando a resposta é 401/409. O login usa esse retorno para
         // oferecer a troca de senha somente na primeira tentativa elegível.
-        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery'){
+        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery' || method === 'resetUserPassword'){
           try{
             const payload = await res.json();
             if(payload && typeof payload === 'object') return payload;
@@ -223,6 +223,7 @@ let refreshPromise = null;
 let passwordChangeMode = null;
 let passwordChangeToken = null;
 let passwordChangeResolve = null;
+let adminResetUserId = null;
 const POLL_INTERVAL_MS = 30000;
 const APP_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -634,6 +635,38 @@ async function rejectUser(id){
   renderPendingUsers();
 }
 
+function openUserPasswordModal(id, encodedEmail){
+  if(!user || user.role !== 'admin') return;
+  adminResetUserId = id;
+  document.getElementById('userPasswordEmail').value = decodeURIComponent(encodedEmail || '');
+  document.getElementById('userPasswordInput').value = '';
+  document.getElementById('userPasswordConfirmInput').value = '';
+  document.getElementById('userPasswordError').textContent = '';
+  document.getElementById('userPasswordModalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('userPasswordInput').focus(), 50);
+}
+
+function closeUserPasswordModal(){
+  adminResetUserId = null;
+  document.getElementById('userPasswordModalOverlay').classList.remove('open');
+}
+
+async function submitUserPasswordReset(){
+  if(!adminResetUserId || !user || user.role !== 'admin') return;
+  const password = document.getElementById('userPasswordInput').value;
+  const confirmation = document.getElementById('userPasswordConfirmInput').value;
+  const error = document.getElementById('userPasswordError');
+  if(password.length < 6){ error.textContent = 'A nova senha deve ter pelo menos 6 caracteres.'; return; }
+  if(password !== confirmation){ error.textContent = 'As senhas não conferem.'; return; }
+  const response = await api('resetUserPassword', {id: adminResetUserId, password});
+  if(response && response.ok){
+    closeUserPasswordModal();
+    window.alert('Senha redefinida com sucesso.');
+    return;
+  }
+  error.textContent = (response && response.error) || 'Não foi possível redefinir a senha.';
+}
+
 function logout(){
   stopPolling();
   api('logout');
@@ -741,18 +774,29 @@ function renderPendingUsers(){
     const pending = res.filter(u => u.status === 'pending');
     if(pending.length === 0){
       sec.style.display = 'none';
-      return;
-    }
-    sec.style.display = 'block';
-    list.innerHTML = pending.map(u => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
-        <span>${escapeHtml(u.email)}</span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="approveUser('${u.id}')">\u2713</button>
-          <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="rejectUser('${u.id}')">\u2717</button>
+    } else {
+      sec.style.display = 'block';
+      list.innerHTML = pending.map(u => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
+          <span>${escapeHtml(u.email)}</span>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="approveUser('${u.id}')">\u2713</button>
+            <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="rejectUser('${u.id}')">\u2717</button>
+          </div>
         </div>
+      `).join('');
+    }
+
+    const usersSection = document.getElementById('usersSection');
+    const usersList = document.getElementById('usersList');
+    const approved = res.filter(u => u.status === 'approved');
+    usersSection.style.display = 'block';
+    usersList.innerHTML = approved.length ? approved.map(u => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
+        <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:var(--text-muted);">${u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'}</small></div>
+        <button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="openUserPasswordModal('${u.id}','${encodeURIComponent(u.email)}')">Redefinir senha</button>
       </div>
-    `).join('');
+    `).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário aprovado.</p></div>';
   });
 }
 
