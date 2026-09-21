@@ -400,9 +400,15 @@ switch ($action) {
             $supabaseServiceKey
         );
         if ($response['status'] < 200 || $response['status'] >= 300) {
+            $errorBody = is_array($response['body'] ?? null) ? $response['body'] : [];
+            $errorMessage = $errorBody['msg'] ?? $errorBody['message'] ?? $errorBody['error_description'] ?? $errorBody['error'] ?? 'Não foi possível redefinir a senha.';
+            $errorCode = $errorBody['error_code'] ?? $errorBody['code'] ?? null;
+            error_log('Supabase password reset failed: HTTP ' . $response['status'] . ($errorCode ? ' code=' . $errorCode : ''));
             http_response_code($response['status'] === 0 ? 500 : 400);
             echo json_encode([
-                'error' => $response['body']['msg'] ?? $response['body']['message'] ?? 'Não foi possível redefinir a senha.'
+                'error' => $errorMessage,
+                'status' => $response['status'],
+                'code' => $errorCode
             ]);
             break;
         }

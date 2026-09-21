@@ -679,7 +679,10 @@ async function submitUserPasswordReset(){
     window.alert('Senha redefinida com sucesso.');
     return;
   }
-  error.textContent = (response && response.error) || 'Não foi possível redefinir a senha.';
+  const detail = response && (response.code || response.status)
+    ? ` (${[response.code, response.status ? `HTTP ${response.status}` : ''].filter(Boolean).join(' · ')})`
+    : '';
+  error.textContent = ((response && response.error) || 'Não foi possível redefinir a senha.') + detail;
 }
 
 async function forceUserPasswordChange(id, encodedEmail){
