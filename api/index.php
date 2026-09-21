@@ -170,8 +170,13 @@ switch ($action) {
             $supabasePublishableKey
         );
         if ($auth['status'] < 200 || $auth['status'] >= 300 || empty($auth['body']['user']['id'])) {
+            if ($supabaseServiceKey === '') {
+                http_response_code(500);
+                echo json_encode(['error' => 'A recuperação do primeiro acesso precisa da SUPABASE_SECRET_KEY configurada no servidor.']);
+                break;
+            }
             $profile = supabaseProfileByEmail($input['email'] ?? '');
-            if ($profile && empty($profile['password_reset_offered'])) {
+            if ($profile && (!empty($profile['password_change_required']) || empty($profile['password_reset_offered']))) {
                 $marked = supabaseRequest(
                     'PATCH',
                     '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
@@ -265,6 +270,29 @@ switch ($action) {
             break;
         }
         echo json_encode(['ok' => true]);
+        break;
+
+    case 'completePasswordRecovery':
+        $profile = supabaseCurrentProfile();
+        if (!$profile) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Sessão de recuperação inválida.']);
+            break;
+        }
+        if ($supabaseServiceKey === '') {
+            http_response_code(500);
+            echo json_encode(['error' => 'SUPABASE_SECRET_KEY não configurada no servidor.']);
+            break;
+        }
+        $profileUpdate = supabaseRequest(
+            'PATCH',
+            '/rest/v1/profiles?id=eq.' . rawurlencode($profile['id']),
+            ['password_change_required' => false, 'password_reset_offered' => true],
+            null,
+            $supabaseServiceKey,
+            ['Prefer: return=minimal']
+        );
+        echo json_encode(['ok' => $profileUpdate['status'] >= 200 && $profileUpdate['status'] < 300]);
         break;
 
     case 'session':

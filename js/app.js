@@ -121,7 +121,7 @@ async function api(method, body){
         // Login/registro precisam devolver ao chamador os detalhes do backend
         // mesmo quando a resposta é 401/409. O login usa esse retorno para
         // oferecer a troca de senha somente na primeira tentativa elegível.
-        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange'){
+        if(method === 'login' || method === 'register' || method === 'requestPasswordReset' || method === 'completeFirstAccessPasswordChange' || method === 'completePasswordRecovery'){
           try{
             const payload = await res.json();
             if(payload && typeof payload === 'object') return payload;
@@ -494,6 +494,15 @@ async function handlePasswordRecovery(){
     body: JSON.stringify({password})
   });
   if(response.ok){
+    try{
+      await fetch(`${API_URL}?action=completePasswordRecovery`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+    }catch(e){}
     window.alert('Senha criada com sucesso. Agora faça login.');
     history.replaceState(null, '', location.pathname + location.search);
   } else {

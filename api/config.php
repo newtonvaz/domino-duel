@@ -105,7 +105,7 @@ function supabaseProfileByEmail($email) {
     global $supabaseServiceKey;
     $response = supabaseRequest(
         'GET',
-        '/rest/v1/profiles?select=id,email,role,status,password_reset_offered&email=eq.' . rawurlencode(strtolower(trim($email))) . '&limit=1',
+        '/rest/v1/profiles?select=id,email,role,status,password_reset_offered,password_change_required&email=eq.' . rawurlencode(strtolower(trim($email))) . '&limit=1',
         null,
         null,
         $supabaseServiceKey
