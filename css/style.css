@@ -181,7 +181,7 @@ body.is-admin .admin-only.access-menu-item{display:flex;}
 .icon-players{mask:var(--icon-players) center/contain no-repeat;-webkit-mask:var(--icon-players) center/contain no-repeat;}
 .icon-settings{mask:var(--icon-settings) center/contain no-repeat;-webkit-mask:var(--icon-settings) center/contain no-repeat;}
 .access-icon{display:inline-block;width:18px;height:18px;background:currentColor;}
-.access-key-icon{width:19px;height:19px;background:none;overflow:visible;}
+.access-password-icon{width:21px;height:21px;background:none;overflow:visible;}
 .icon-block{mask:var(--icon-block) center/contain no-repeat;-webkit-mask:var(--icon-block) center/contain no-repeat;}
 .icon-unblock{mask:var(--icon-unblock) center/contain no-repeat;-webkit-mask:var(--icon-unblock) center/contain no-repeat;}
 .icon-key{mask:var(--icon-key) center/contain no-repeat;-webkit-mask:var(--icon-key) center/contain no-repeat;}
