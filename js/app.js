@@ -901,7 +901,7 @@ function renderPendingUsers(){
         actions.push(`<button class="btn btn-primary access-action" data-tooltip="Desbloquear usuário" onclick="unblockUser('${u.id}','${encodedEmail}')" aria-label="Desbloquear usuário"><span class="access-icon icon-unblock"></span></button>`);
       }
       if(u.status === 'approved'){
-        actions.push(`<button class="btn btn-ghost access-action" data-tooltip="Forçar troca de senha" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')" aria-label="Forçar troca de senha"><span class="access-icon icon-key"></span></button>`);
+        actions.push(`<button class="btn btn-ghost access-action" data-tooltip="Forçar troca de senha" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')" aria-label="Forçar troca de senha"><svg class="access-icon access-key-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 10V7a4 4 0 0 1 8 0v3h-2V7a2 2 0 0 0-4 0v3zM6.5 9.5h11a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-6.5a2 2 0 0 1 2-2"/><g fill="var(--surface-2)"><path d="m8 12.8.45 1.25 1.3.15-.98.85.3 1.27L8 15.65l-1.07.67.3-1.27-.98-.85 1.3-.15z"/><path d="m12 12.8.45 1.25 1.3.15-.98.85.3 1.27L12 15.65l-1.07.67.3-1.27-.98-.85 1.3-.15z"/><path d="m16 12.8.45 1.25 1.3.15-.98.85.3 1.27L16 15.65l-1.07.67.3-1.27-.98-.85 1.3-.15z"/></g></svg></button>`);
       }
       if(!isSelf){
         actions.push(`<button class="btn btn-danger access-action danger" data-tooltip="Excluir usuário" onclick="deleteUser('${u.id}','${encodedEmail}')" aria-label="Excluir usuário"><span class="access-icon icon-trash"></span></button>`);
