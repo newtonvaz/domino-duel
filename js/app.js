@@ -876,10 +876,10 @@ function renderPendingUsers(){
       sec.style.display = 'block';
       list.innerHTML = pending.map(u => `
         <div class="access-user-row">
-          <span>${escapeHtml(u.email)}</span>
+          <div class="access-user-main"><div class="access-user-avatar">${escapeHtml((u.email || '?').trim().charAt(0).toUpperCase())}</div><div class="access-user-info"><div class="access-user-email">${escapeHtml(u.email)}</div><small class="access-user-status">Aguardando aprovação</small></div></div>
           <div class="access-actions">
-            <button class="btn btn-primary access-action" onclick="approveUser('${u.id}')" aria-label="Aprovar usuário">Aprovar</button>
-            <button class="btn btn-secondary access-action" onclick="rejectUser('${u.id}')" aria-label="Rejeitar usuário">Rejeitar</button>
+            <button class="btn btn-primary access-action" data-tooltip="Aprovar usuário" onclick="approveUser('${u.id}')" aria-label="Aprovar usuário"><span class="access-icon icon-unblock"></span></button>
+            <button class="btn btn-secondary access-action" data-tooltip="Rejeitar usuário" onclick="rejectUser('${u.id}')" aria-label="Rejeitar usuário"><span class="access-icon icon-block"></span></button>
           </div>
         </div>
       `).join('');
@@ -893,24 +893,23 @@ function renderPendingUsers(){
       const statusLabel = u.status === 'blocked'
         ? 'Bloqueado'
         : (u.status === 'rejected' ? 'Rejeitado' : (u.role === 'admin' ? 'Administrador' : 'Usuário aprovado'));
-      const statusColor = u.status === 'blocked' ? 'var(--red)' : 'var(--text-muted)';
       const actions = [];
       if(!isSelf && u.status === 'approved'){
-        actions.push(`<button class="btn btn-ghost access-action" onclick="blockUser('${u.id}','${encodedEmail}')">Bloquear usuário</button>`);
+        actions.push(`<button class="btn btn-ghost access-action" data-tooltip="Bloquear usuário" onclick="blockUser('${u.id}','${encodedEmail}')" aria-label="Bloquear usuário"><span class="access-icon icon-block"></span></button>`);
       }
       if(!isSelf && u.status === 'blocked'){
-        actions.push(`<button class="btn btn-primary access-action" onclick="unblockUser('${u.id}','${encodedEmail}')">Desbloquear</button>`);
+        actions.push(`<button class="btn btn-primary access-action" data-tooltip="Desbloquear usuário" onclick="unblockUser('${u.id}','${encodedEmail}')" aria-label="Desbloquear usuário"><span class="access-icon icon-unblock"></span></button>`);
       }
       if(u.status === 'approved'){
-        actions.push(`<button class="btn btn-ghost access-action" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')">Forçar troca</button>`);
+        actions.push(`<button class="btn btn-ghost access-action" data-tooltip="Forçar troca de senha" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')" aria-label="Forçar troca de senha"><span class="access-icon icon-key"></span></button>`);
       }
       if(!isSelf){
-        actions.push(`<button class="btn btn-danger access-action" onclick="deleteUser('${u.id}','${encodedEmail}')">Excluir usuário</button>`);
+        actions.push(`<button class="btn btn-danger access-action danger" data-tooltip="Excluir usuário" onclick="deleteUser('${u.id}','${encodedEmail}')" aria-label="Excluir usuário"><span class="access-icon icon-trash"></span></button>`);
       }
       if(!actions.length) actions.push('<small style="color:var(--text-muted);">Sua conta</small>');
       return `
       <div class="access-user-row">
-        <div class="access-user-info"><div class="access-user-email">${escapeHtml(u.email)}</div><small style="color:${statusColor};">${statusLabel}</small></div>
+        <div class="access-user-main"><div class="access-user-avatar">${escapeHtml((u.email || '?').trim().charAt(0).toUpperCase())}</div><div class="access-user-info"><div class="access-user-email">${escapeHtml(u.email)}</div><small class="access-user-status ${u.status}">${statusLabel}</small></div></div>
         <div class="access-actions">${actions.join('')}</div>
       </div>`;
     }).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário cadastrado.</p></div>';
