@@ -879,7 +879,7 @@ function renderPendingUsers(){
           <div class="access-user-main"><div class="access-user-avatar">${escapeHtml((u.email || '?').trim().charAt(0).toUpperCase())}</div><div class="access-user-info"><div class="access-user-email">${escapeHtml(u.email)}</div><small class="access-user-status">Aguardando aprovação</small></div></div>
           <div class="access-actions">
             <button class="btn btn-primary access-action" data-tooltip="Aprovar usuário" onclick="approveUser('${u.id}')" aria-label="Aprovar usuário"><span class="access-icon icon-unblock"></span></button>
-            <button class="btn btn-secondary access-action" data-tooltip="Rejeitar usuário" onclick="rejectUser('${u.id}')" aria-label="Rejeitar usuário"><span class="access-icon icon-block"></span></button>
+            <button class="btn btn-secondary access-action" data-tooltip="Rejeitar usuário" onclick="rejectUser('${u.id}')" aria-label="Rejeitar usuário"><span class="access-icon icon-close"></span></button>
           </div>
         </div>
       `).join('');
