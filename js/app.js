@@ -21,6 +21,7 @@ let data = {players:[], matches:[], settings:{}};
 const SUPABASE_READ_ACTIONS = new Set(['listPlayers', 'listMatches', 'listSettings']);
 let authRefreshTimer = null;
 let authRefreshPromise = null;
+const AUTH_REFRESH_RETRY_MS = 5 * 60 * 1000;
 
 function accessTokenExpiresAt(token, expiresIn = null){
   const duration = Number(expiresIn);
@@ -52,7 +53,13 @@ function scheduleAuthRefresh(expiresIn = null){
   const delay = Math.max(10000, expiresAt - Date.now() - 60000);
   authRefreshTimer = setTimeout(async () => {
     const refreshed = await refreshAuthToken();
-    if(refreshed) scheduleAuthRefresh();
+    if(refreshed){
+      scheduleAuthRefresh();
+    } else if(localStorage.getItem('duelo_refresh_token')){
+      // Dispositivos móveis podem acordar sem rede. Mantemos a sessão local
+      // e tentamos novamente até o refresh token ser aceito pelo servidor.
+      authRefreshTimer = setTimeout(() => scheduleAuthRefresh(), AUTH_REFRESH_RETRY_MS);
+    }
   }, delay);
 }
 
@@ -868,11 +875,11 @@ function renderPendingUsers(){
     } else {
       sec.style.display = 'block';
       list.innerHTML = pending.map(u => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);">
+        <div class="access-user-row">
           <span>${escapeHtml(u.email)}</span>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="approveUser('${u.id}')">\u2713</button>
-            <button class="btn btn-secondary" style="padding:6px 14px;font-size:13px;" onclick="rejectUser('${u.id}')">\u2717</button>
+          <div class="access-actions">
+            <button class="btn btn-primary access-action" onclick="approveUser('${u.id}')" aria-label="Aprovar usuário">Aprovar</button>
+            <button class="btn btn-secondary access-action" onclick="rejectUser('${u.id}')" aria-label="Rejeitar usuário">Rejeitar</button>
           </div>
         </div>
       `).join('');
@@ -889,22 +896,22 @@ function renderPendingUsers(){
       const statusColor = u.status === 'blocked' ? 'var(--red)' : 'var(--text-muted)';
       const actions = [];
       if(!isSelf && u.status === 'approved'){
-        actions.push(`<button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="blockUser('${u.id}','${encodedEmail}')">Bloquear</button>`);
+        actions.push(`<button class="btn btn-ghost access-action" onclick="blockUser('${u.id}','${encodedEmail}')">Bloquear usuário</button>`);
       }
       if(!isSelf && u.status === 'blocked'){
-        actions.push(`<button class="btn btn-primary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="unblockUser('${u.id}','${encodedEmail}')">Desbloquear</button>`);
+        actions.push(`<button class="btn btn-primary access-action" onclick="unblockUser('${u.id}','${encodedEmail}')">Desbloquear</button>`);
       }
       if(u.status === 'approved'){
-        actions.push(`<button class="btn btn-ghost" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')">Forçar troca</button>`);
+        actions.push(`<button class="btn btn-ghost access-action" onclick="forceUserPasswordChange('${u.id}','${encodedEmail}')">Forçar troca</button>`);
       }
       if(!isSelf){
-        actions.push(`<button class="btn btn-secondary" style="width:auto;padding:7px 10px;font-size:12px;white-space:nowrap;color:#f2a7a7;" onclick="deleteUser('${u.id}','${encodedEmail}')">Apagar</button>`);
+        actions.push(`<button class="btn btn-danger access-action" onclick="deleteUser('${u.id}','${encodedEmail}')">Excluir usuário</button>`);
       }
       if(!actions.length) actions.push('<small style="color:var(--text-muted);">Sua conta</small>');
       return `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);">
-        <div style="min-width:0;"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(u.email)}</div><small style="color:${statusColor};">${statusLabel}</small></div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${actions.join('')}</div>
+      <div class="access-user-row">
+        <div class="access-user-info"><div class="access-user-email">${escapeHtml(u.email)}</div><small style="color:${statusColor};">${statusLabel}</small></div>
+        <div class="access-actions">${actions.join('')}</div>
       </div>`;
     }).join('') : '<div class="empty-state" style="padding:16px 6px;"><p>Nenhum usuário cadastrado.</p></div>';
   });

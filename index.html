@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" sizes="152x152" href="icons/logo-domino-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/logo-domino-192.png">
 <link rel="apple-touch-icon" href="icons/logo-domino-192.png">
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
 <div class="app-shell">
@@ -69,8 +69,8 @@
       <div class="view-heading"><h2 class="section-title">Mais</h2><p>RECURSOS DO JOGO</p></div>
       <div class="more-menu">
         <button class="shortcut-card" onclick="showView('ranking')"><span class="shortcut-icon icon-chart"></span><span><b>Estatísticas</b><small>Ranking e desempenho das duplas</small></span><span class="chevron">›</span></button>
-        <button class="shortcut-card" onclick="showView('players')"><span class="shortcut-icon icon-more"></span><span><b>Jogadores</b><small>Gerencie os participantes da mesa</small></span><span class="chevron">›</span></button>
-        <button class="shortcut-card admin-only access-menu-item" onclick="showView('access')"><span class="shortcut-icon icon-lock"></span><span><b>Gerenciar acesso</b><small>Aprove, bloqueie ou remova usuários</small></span><span class="chevron">›</span></button>
+        <button class="shortcut-card" onclick="showView('players')"><span class="shortcut-icon icon-players"></span><span><b>Jogadores</b><small>Gerencie os participantes da mesa</small></span><span class="chevron">›</span></button>
+        <button class="shortcut-card admin-only access-menu-item" onclick="showView('access')"><span class="shortcut-icon icon-settings"></span><span><b>Gerenciar acesso</b><small>Aprove, bloqueie ou remova usuários</small></span><span class="chevron">›</span></button>
       </div>
     </section>
 
@@ -229,7 +229,7 @@
 </div>
 </div>
 
-<script src="js/app.js?v=29"></script>
+<script src="js/app.js?v=30"></script>
 <script>
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
